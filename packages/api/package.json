@@ -1,0 +1,1 @@
+{"name":"@clipship/api","version":"0.1.0","private":true,"type":"module","main":"./src/index.ts","dependencies":{"@clipship/types":"*","@tauri-apps/api":"^2.3.0","@tauri-apps/plugin-dialog":"^2.2.0"}}

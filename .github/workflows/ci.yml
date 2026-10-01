@@ -1,0 +1,32 @@
+name: ClipShip foundation checks
+on:
+  pull_request:
+  push:
+    branches: [main, 'arena/01a0f65d-bliss']
+permissions:
+  contents: read
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: python/requirements.txt
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: python -m pip install -r python/requirements.txt
+      - run: python -m ruff check python
+      - run: python -m compileall -q python/app
+      - run: python -m pytest -c python/pyproject.toml python/tests -q
