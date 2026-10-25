@@ -2,6 +2,9 @@
 
 > **Your ideas. Infinite possibilities.**
 
+> Live deployment: **https://bliss-ai-iota.vercel.app** · verified 2026-10-25 — `/api/health` reported
+> `status: operational` with the text upstream returning HTTP 200 and a valid JSON payload.
+
 Bliss is an all-in-one AI workspace: multi-model chat, image generation, AI image editing and image-to-video
 creation — wrapped in one blue-gradient, glass-lit interface that works on desktop, tablet and mobile.
 
@@ -223,6 +226,10 @@ npm i -g vercel
 vercel            # link
 vercel --prod
 ```
+
+Already deployed: project **bliss-ai** → `https://bliss-ai-iota.vercel.app` (production alias) and
+`https://bliss-ai-git-arena-b92fb736-bliss-obiorachibuikes-projects.vercel.app` (branch preview).
+Function timeouts for the long-running routes are declared in `vercel.json` (`/api/video` 300s, `/api/image` 180s).
 
 Nothing else is required: no env vars, no database, no build command overrides. The project builds with
 `next build` (Turbopack) and runs on the Node runtime; `/api/video` sets `maxDuration = 300`, so on Vercel's Hobby
