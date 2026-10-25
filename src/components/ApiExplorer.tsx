@@ -1,12 +1,13 @@
 "use client";
 import { useState } from "react";
-import { Code2, Copy, Check, ChevronDown, ExternalLink, Circle, Zap, Server, ShieldAlert, Menu } from "lucide-react";
+import { Code2, Copy, Check, ChevronDown, ExternalLink, Circle, Zap, Server, ShieldAlert, Menu, Layers } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "@/components/ui/Toast";
-import { MODELS, API_HOST } from "@/lib/api/config";
+import { API_HOST, MODELS, AGNES_BASE_URL, AGNES_LIMITS, RATIOS } from "@/lib/api/config";
+import { useFallbackStatus } from "@/lib/hooks/useModelCatalog";
 
 interface Param {
   name: string;
@@ -19,7 +20,7 @@ interface EndpointDoc {
   name: string;
   method: "GET" | "POST";
   path: string;
-  group: "Upstream · CVRON" | "Bliss internal";
+  group: "Upstream · CVRON" | "Upstream · Agnes" | "Bliss internal";
   params: Param[];
   example: string;
   response: string;
@@ -27,9 +28,54 @@ interface EndpointDoc {
   limitation?: string;
 }
 
+
+/* Documented Agnes AI surface — Bliss only lists what it actually calls. The video
+ * models of this provider are deliberately absent: their request and polling shapes
+ * aren't verified here, so Bliss doesn't claim support for them. */
+const AGNES_DOCS: EndpointDoc[] = [
+  {
+    key: "agnes-chat",
+    name: "Agnes chat completions (fallback)",
+    method: "POST",
+    path: `${AGNES_BASE_URL}/chat/completions`,
+    group: "Upstream · Agnes",
+    params: [
+      { name: "model", type: "string", required: true, desc: "agnes-2.5-flash (Bliss' fallback) — also agnes-3.0-flash per docs" },
+      { name: "messages", type: "{role, content}[]", required: true, desc: "Real multi-turn array: system, user and assistant turns are forwarded unflattened." },
+      { name: "temperature", type: "number", required: false, desc: `Bliss pins ${AGNES_LIMITS.temperature}` },
+      { name: "max_tokens", type: "number", required: false, desc: `Bliss pins ${AGNES_LIMITS.maxOutputTokens}` },
+      { name: "stream", type: "boolean", required: false, desc: "Documented, but Bliss sends stream: false and renders whole responses" },
+    ],
+    example: `curl ${AGNES_BASE_URL}/chat/completions \\\n  -H "Authorization: Bearer $AGNES_API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"agnes-2.5-flash","messages":[{"role":"user","content":"Hello!"}]}'`,
+    response: `{\n  "id": "chatcmpl_xxx",\n  "choices": [{ "message": { "role": "assistant", "content": "Hi!" }, "finish_reason": "stop" }],\n  "usage": { "prompt_tokens": 24, "completion_tokens": 18, "total_tokens": 42 }\n}`,
+    capabilities: ["Bearer key", "Multi-turn", "Vision via image_url"],
+    limitation: "Requires a server-side AGNES_API_KEY. Free tier is documented around 20 executable requests/minute, so Bliss retries once and never probes it from /api/health.",
+  },
+  {
+    key: "agnes-image",
+    name: "Agnes image generations (fallback)",
+    method: "POST",
+    path: `${AGNES_BASE_URL}/images/generations`,
+    group: "Upstream · Agnes",
+    params: [
+      { name: "model", type: "string", required: true, desc: "agnes-image-2.1-flash" },
+      { name: "prompt", type: "string", required: true, desc: "Generation or edit instruction" },
+      { name: "size", type: "string", required: true, desc: "Tier: 1K | 2K | 3K | 4K — Bliss uses 1K" },
+      { name: "ratio", type: "string", required: false, desc: `One of ${RATIOS.join(", ")} — Bliss forwards the studio's aspect ratio` },
+      { name: "extra_body.image", type: "string[]", required: false, desc: "Public URLs or data-URI images for image-to-image edits" },
+      { name: "extra_body.response_format", type: "string", required: false, desc: `url` },
+    ],
+    example: `curl ${AGNES_BASE_URL}/images/generations \\\n  -H "Authorization: Bearer $AGNES_API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{"model":"agnes-image-2.1-flash","prompt":"A blue planet","size":"1K","ratio":"16:9","extra_body":{"response_format":"url"}}'`,
+    response: `{\n  "created": 1780000000,\n  "data": [{ "url": "https://storage…/xxx.png", "b64_json": null }]\n}`,
+    capabilities: ["Text-to-Image", "Image-to-Image", "Aspect ratios"],
+    limitation: "response_format must live inside extra_body; Bliss reads only data[0].url and rejects base64 output rather than pasting it into an <img> tag.",
+  },
+];
+
 const BASE = API_HOST;
 
 const DOCS: EndpointDoc[] = [
+  ...AGNES_DOCS,
   ...MODELS.map((m) => ({
     key: `chat-${m.id}`,
     name: `${m.name} completion`,
@@ -108,9 +154,9 @@ const DOCS: EndpointDoc[] = [
       { name: "history", type: "Message[]", required: false, desc: "Prior turns; the last 6 are folded into a single prompt" },
     ],
     example: `fetch("/api/chat", {\n  method: "POST",\n  headers: { "Content-Type": "application/json" },\n  body: JSON.stringify({\n    model: "llama",\n    prompt: "Hello!",\n    history: [{ role: "user", content: "Hi" }],\n  }),\n})`,
-    response: `{\n  "success": true,\n  "response": "Hey! What can I help you build?",\n  "model": "llama"\n}`,
-    capabilities: ["Rate limited", "Input validation", "Retries", "Timeouts"],
-    limitation: "20 requests / minute / IP. Upstream failures return 502 with a friendly message; the raw error is only surfaced in development.",
+    response: `{\n  "success": true,\n  "response": "Hey! What can I help you build?",\n  "model": "llama",\n  "answeredBy": "agnes-2.5-flash",\n  "provider": "agnes",\n  "fallbackUsed": true\n}`,
+    capabilities: ["Rate limited", "Input validation", "Retries", "Timeouts", "Automatic fallback"],
+    limitation: "20 requests / minute / IP. On primary failure the route retries the same turn against Agnes AI with a real messages array (and the pasted image as image_url when vision is on). Successes carry provider + fallbackUsed; failures return 502 with a friendly message and the raw error only in development.",
   },
   {
     key: "image-route",
@@ -124,8 +170,9 @@ const DOCS: EndpointDoc[] = [
       { name: "imageUrl", type: "url", required: false, desc: "Required for edit; http/https only" },
     ],
     example: `fetch("/api/image", {\n  method: "POST",\n  body: JSON.stringify({ mode: "generate", prompt: "A blue planet" }),\n})`,
-    response: `{ "success": true, "imageUrl": "https://…/image.jpg" }`,
-    capabilities: ["SSRF-safe URL checks", "Timeout 90s / 120s"],
+    response: `{ "success": true, "imageUrl": "https://…/image.jpg", "model": "flux-dev", "provider": "cvron", "fallbackUsed": false }`,
+    capabilities: ["SSRF-safe URL checks", "Timeout 90s / 120s", "Automatic fallback"],
+    limitation: "Accepts an optional model (flux-dev | agnes-image-2.1-flash) and ratio. An explicit Agnes choice is never answered by the key-less provider.",
   },
   {
     key: "video-route",
@@ -169,7 +216,9 @@ const DOCS: EndpointDoc[] = [
 export function ApiExplorer({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
   const [open, setOpen] = useState<string | null>("chat-llama");
   const [copied, setCopied] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "Upstream · CVRON" | "Bliss internal">("all");
+  const [filter, setFilter] = useState<"all" | "Upstream · CVRON" | "Upstream · Agnes" | "Bliss internal">("all");
+  // Read from /api/models at runtime: the key itself never reaches the browser bundle.
+  const fallback = useFallbackStatus();
 
   const copy = async (text: string, id: string) => {
     await navigator.clipboard.writeText(text);
@@ -204,16 +253,25 @@ export function ApiExplorer({ onOpenMobileNav }: { onOpenMobileNav: () => void }
           <div className="flex items-start gap-2 rounded-xl border border-[#2563EB]/20 bg-[#EFF6FF] px-3.5 py-3 text-xs leading-relaxed text-[#1D4ED8] dark:bg-[#2563EB]/10 dark:text-[#93C5FD]">
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              No credentials exist for this provider — it is a free, key-less API. Bliss still keeps every call on the server
-              so the browser never talks to the upstream directly, and adds validation, timeouts, retries and per-IP rate limits.
+              The primary provider is free and key-less — no credential of yours is ever sent to it. Bliss still keeps every
+              call on the server so the browser never talks to an upstream directly, and adds validation, timeouts, retries and
+              per-IP rate limits.{" "}
+              {fallback.enabled
+                ? "The Agnes fallback is enabled: its key stays in the server environment and never reaches the client bundle."
+                : "Set AGNES_API_KEY to enable the documented Agnes AI fallback (chat, vision and images) when the free upstream fails."}
             </span>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {(["all", "Upstream · CVRON", "Bliss internal"] as const).map((f) => (
+            {(["all", "Upstream · CVRON", "Upstream · Agnes", "Bliss internal"] as const).map((f) => (
               <button key={f} onClick={() => setFilter(f)} className={cn("flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition", filter === f ? "border-transparent brand-gradient text-white" : "hover:bg-slate-50 dark:hover:bg-white/5")}>
-                {f === "Upstream · CVRON" ? <Zap className="h-3 w-3" /> : f === "Bliss internal" ? <Server className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
+                {f === "Upstream · CVRON" ? <Zap className="h-3 w-3" /> : f === "Bliss internal" ? <Server className="h-3 w-3" /> : f === "Upstream · Agnes" ? <Layers className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
                 {f}
+                {f === "Upstream · Agnes" && (
+                  <span className={cn("rounded-full px-1.5 py-0.5 text-[9px] font-semibold", fallback.enabled ? "bg-[#22C55E]/15 text-[#16A34A]" : "bg-slate-100 text-[#94A3B8] dark:bg-white/10")}>
+                    {fallback.enabled ? "on" : "needs key"}
+                  </span>
+                )}
               </button>
             ))}
           </div>

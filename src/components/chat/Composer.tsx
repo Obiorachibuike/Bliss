@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { ModelSelector } from "./ModelSelector";
 import type { ModelId } from "@/lib/types";
 import { useSettingsStore } from "@/lib/store/settingsStore";
+import { useFallbackStatus } from "@/lib/hooks/useModelCatalog";
 import { isValidUrl } from "@/lib/api/client";
 import { toast } from "@/components/ui/Toast";
 
@@ -29,6 +30,7 @@ export function Composer({
   const [imageUrl, setImageUrl] = useState("");
   const [focused, setFocused] = useState(false);
   const taRef = useRef<HTMLTextAreaElement>(null);
+  const fallback = useFallbackStatus();
   const enterToSend = useSettingsStore((s) => s.enterToSend);
   const maxLen = 4000;
 
@@ -77,7 +79,8 @@ export function Composer({
           <div className="animate-pop mb-2 rounded-2xl border border-[rgba(148,163,184,0.16)] bg-white p-3 shadow-lg dark:bg-[#101827]">
             <div className="mb-2 flex items-center justify-between">
               <p className="flex items-center gap-1.5 text-xs font-semibold">
-                <Link2 className="h-3.5 w-3.5 text-[#2563EB]" /> Reference a hosted image
+                <Link2 className="h-3.5 w-3.5 text-[#2563EB]" />
+                {fallback.vision ? "Attach an image for analysis" : "Reference a hosted image"}
               </p>
               <button onClick={() => setAttachOpen(false)} aria-label="Close attachment panel" className="rounded-md p-1 hover:bg-slate-100 dark:hover:bg-white/10">
                 <X className="h-3.5 w-3.5" />
@@ -95,8 +98,9 @@ export function Composer({
             </div>
             <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed text-[#94A3B8]">
               <Info className="mt-0.5 h-3 w-3 shrink-0" />
-              The upstream models accept text only — Bliss has no vision endpoint, so an image URL is included as text for the
-              model to reference, not analysed.
+              {fallback.vision
+                ? "With the Agnes fallback enabled, Bliss also sends the image as a real image_url part so the model can see it. The key-less upstreams still get it as text only."
+                : "The upstream models accept text only — there is no vision endpoint, so an image URL is included as text for the model to reference, not analysed. Set AGNES_API_KEY to enable image analysis."}
             </p>
           </div>
         )}

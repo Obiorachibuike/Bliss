@@ -2,7 +2,12 @@ export type ModelId =
   | "llama"
   | "gpt-5-nano"
   | "gemini-2.5-flash-lite"
-  | "deepseek-v3.2";
+  | "deepseek-v3.2"
+  /** Direct fallback-provider model: routed to Agnes AI, never through CVRON. */
+  | "agnes-2.5-flash";
+
+/** Which provider actually answered a generation. */
+export type ProviderId = "cvron" | "agnes" | "unknown";
 
 export interface AIModel {
   id: ModelId;
@@ -14,6 +19,8 @@ export interface AIModel {
   color: string;
   icon: string;
   available: boolean;
+  /** True when the model is served by the optional Agnes fallback provider. */
+  fallback?: boolean;
 }
 
 export interface ChatMessage {
@@ -22,6 +29,8 @@ export interface ChatMessage {
   content: string;
   timestamp: number;
   modelId?: ModelId;
+  /** Set when the reply was produced by the fallback provider. */
+  via?: ProviderId;
   error?: string;
   imageUrl?: string;
   videoUrl?: string;

@@ -1,15 +1,17 @@
 "use client";
 import { useEffect, useState } from "react";
 import { X, Gauge, Info, Check, Loader2, XCircle } from "lucide-react";
-import { MODELS, API_LIMITATIONS, ENDPOINTS } from "@/lib/api/config";
+import { MODELS_WITH_FALLBACK, API_LIMITATIONS, ENDPOINTS } from "@/lib/api/config";
+import { useFallbackStatus } from "@/lib/hooks/useModelCatalog";
 import type { ModelId } from "@/lib/types";
 import { cn } from "@/lib/utils/cn";
 
 type Health = {
-  status: "loading" | "operational" | "degraded";
+  status: "loading" | "operational" | "degraded" | "degraded-with-fallback";
   checkedAt?: string;
   text?: { reachable: boolean; latency: number };
   image?: { reachable: boolean; latency: number };
+  fallbackEnabled?: boolean;
 };
 
 export function ContextPanel({
@@ -23,7 +25,8 @@ export function ContextPanel({
   conversationTitle?: string;
   messageCount: number;
 }) {
-  const model = MODELS.find((m) => m.id === modelId)!;
+  const model = MODELS_WITH_FALLBACK.find((m) => m.id === modelId) ?? MODELS_WITH_FALLBACK[0];
+  const fallback = useFallbackStatus();
   const [health, setHealth] = useState<Health>({ status: "loading" });
 
   useEffect(() => {
@@ -37,6 +40,7 @@ export function ContextPanel({
           checkedAt: d.checkedAt,
           text: d.services?.text,
           image: d.services?.image,
+          fallbackEnabled: !!d.fallback?.enabled,
         });
       })
       .catch(() => !cancelled && setHealth({ status: "degraded" }));
@@ -50,8 +54,9 @@ export function ContextPanel({
     { label: "Image generation", ok: true },
     { label: "Image editing", ok: true },
     { label: "Image → video", ok: true },
+    { label: "Auto fallback", ok: fallback.enabled },
+    { label: "Vision analysis", ok: fallback.vision },
     { label: "Streaming", ok: false },
-    { label: "Vision analysis", ok: false },
   ];
 
   return (
@@ -142,6 +147,13 @@ export function ContextPanel({
                 Server-side probe of <span className="font-mono">{new URL(ENDPOINTS.chat.llama).host}</span>, cached for 60s.
                 {health.checkedAt ? ` Last checked ${new Date(health.checkedAt).toLocaleTimeString()}.` : ""}
               </p>
+              <div className="mt-1 flex items-center justify-between rounded-xl border border-[rgba(148,163,184,0.16)] px-2.5 py-2">
+                <span className="flex items-center gap-2 text-[11px]">
+                  <span className={cn("h-2 w-2 rounded-full", fallback.enabled ? "bg-[#22C55E]" : "bg-[#94A3B8]/50")} />
+                  Agnes AI fallback
+                </span>
+                <span className="text-[11px] text-[#94A3B8]">{fallback.enabled ? "configured" : "needs AGNES_API_KEY"}</span>
+              </div>
             </div>
           )}
         </div>

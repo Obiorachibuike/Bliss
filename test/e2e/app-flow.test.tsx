@@ -35,7 +35,11 @@ function mockUpstream(overrides: Partial<{ image: string; video: string; failCha
           status: "operational",
           services: { text: { reachable: true, latency: 420 }, image: { reachable: true, latency: 900 } },
           capabilities: { chat: true, imageGeneration: true, vision: false, streaming: false },
+          fallback: { enabled: false },
         });
+      }
+      if (path === "/api/models") {
+        return Response.json({ success: true, fallback: { enabled: false, provider: "Agnes AI", vision: false } });
       }
       if (path === "/api/chat") {
         if (overrides.failChat) {
@@ -46,7 +50,13 @@ function mockUpstream(overrides: Partial<{ image: string; video: string; failCha
         return Response.json({ success: true, response: UPSTREAM.response, model: body.model });
       }
       if (path === "/api/image") {
-        return Response.json({ success: true, imageUrl: overrides.image ?? "https://cdn.test/gen-1.jpg" });
+        return Response.json({
+          success: true,
+          imageUrl: overrides.image ?? "https://cdn.test/gen-1.jpg",
+          model: "flux-dev",
+          provider: "cvron",
+          fallbackUsed: false,
+        });
       }
       if (path === "/api/video") {
         return Response.json({ success: true, videoUrl: overrides.video ?? "https://cdn.test/clip.mp4" });
@@ -252,9 +262,13 @@ describe("Bliss end-to-end journey", () => {
     expect(await screen.findByText(/flux dev image generation/i)).toBeInTheDocument();
     expect(screen.getByText(/WAN 2.2 image to video/i)).toBeInTheDocument();
     expect(screen.getByText(/Not implemented because it isn/i)).toBeInTheDocument();
-    // no invented endpoints
-    expect(screen.queryByText(/chat\/completions/i)).not.toBeInTheDocument();
+    // the fallback provider is documented, with its real contract and its honest caveats
+    expect(screen.getByText(/agnes chat completions/i)).toBeInTheDocument();
+    expect(screen.getByText(/agnes image generations/i)).toBeInTheDocument();
+    expect(screen.getByText(/needs key/i)).toBeInTheDocument();
+    // no invented endpoints: nothing Bliss cannot actually do
     expect(screen.queryByText(/realtime streaming/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\/v1\/videos/i)).not.toBeInTheDocument();
   });
 
   it("history search finds messages inside conversations", async () => {

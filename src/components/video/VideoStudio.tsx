@@ -33,11 +33,13 @@ export function VideoStudio({
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
+  const [providerNote, setProviderNote] = useState<string | null>(null);
   const { videos, addVideo } = useSavedStore();
 
   const run = async () => {
     setError(null);
     setVideoUrl(null);
+    setProviderNote(null);
     if (!prompt.trim()) return setError("Describe the motion you want.");
     if (!imageUrl.trim()) return setError("WAN 2.2 animates a still image: a public source image URL is required.");
 
@@ -57,6 +59,9 @@ export function VideoStudio({
         throw new Error(data?.error ?? "The video service did not return a finished video.");
       }
       setVideoUrl(data.videoUrl);
+      setProviderNote(
+        "Animated by WAN 2.2 (key-less provider). This route has no fallback provider, so a failure means the video service is down."
+      );
       addVideo({ id: String(Date.now()), prompt: prompt.trim(), imageUrl: imageUrl.trim(), videoUrl: data.videoUrl, createdAt: Date.now() });
       toast.success("Video ready");
     } catch (e: unknown) {
@@ -188,6 +193,11 @@ export function VideoStudio({
                       <Button size="sm" variant="outline" onClick={() => setPreview(true)}>Fullscreen</Button>
                       <Button size="sm" variant="outline" onClick={run}>Regenerate</Button>
                     </div>
+                    {providerNote && (
+                      <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed text-[#94A3B8]">
+                        <Info className="mt-0.5 h-3 w-3 shrink-0" /> {providerNote}
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div className="flex aspect-video flex-col items-center justify-center gap-3 rounded-xl border border-dashed text-center">

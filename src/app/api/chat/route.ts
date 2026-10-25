@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { generateText } from "@/lib/api/text";
-import { MODELS } from "@/lib/api/config";
+import { MODELS_WITH_FALLBACK } from "@/lib/api/config";
+import { generateChatWithFallback, isFallbackModel } from "@/lib/api/provider";
+import { isAgnesConfigured } from "@/lib/api/agnes";
 import type { ModelId } from "@/lib/types";
 
-export const maxDuration = 60;
+export const maxDuration = 90;
 
-const VALID_MODELS = new Set<string>(MODELS.map((m) => m.id));
+const VALID_MODELS = new Set<string>(MODELS_WITH_FALLBACK.map((m) => m.id));
 const MAX_TURNS = 8;
 const MAX_TURN_CHARS = 900;
 const MAX_BODY_CHARS = 24_000;
@@ -77,6 +78,13 @@ export function stripScaffold(text: string): string {
     .trim();
 }
 
+/** The composer inserts pasted images as `![reference image](url)`; the fallback
+ *  provider can actually look at that URL, so pull it back out for analysis. */
+export function extractImageUrl(text: string): string | undefined {
+  const match = /!\[[^\]]*\]\((https?:\/\/[^\s)]+)\)/i.exec(text);
+  return match?.[1];
+}
+
 export async function POST(req: Request) {
   let body: { model?: unknown; prompt?: unknown; history?: unknown };
   try {
@@ -100,6 +108,17 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: false, error: "Your message is too long." }, { status: 413 });
   }
 
+  // A fallback-only model must never be silently answered by the primary provider.
+  if (isFallbackModel(model) && !isAgnesConfigured()) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: "This model needs the optional Agnes fallback provider, which isn't enabled on this deployment. Set AGNES_API_KEY to switch it on.",
+      },
+      { status: 400 }
+    );
+  }
+
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
   if (rateLimited(ip)) {
     return NextResponse.json(
@@ -108,19 +127,39 @@ export async function POST(req: Request) {
     );
   }
 
-  const composed = buildContextPrompt(prompt.trim(), history as HistoryTurn[] | undefined);
+  const trimmedPrompt = prompt.trim();
+  const turns = (Array.isArray(history) ? history : []) as HistoryTurn[];
+  const composed = buildContextPrompt(trimmedPrompt, turns);
+  const visionUrl = extractImageUrl(trimmedPrompt);
 
   try {
-    const { response } = await generateText(model as ModelId, composed, req.signal);
-    const clean = stripScaffold(response);
-    if (!clean) {
-      throw new Error("empty response");
-    }
-    return NextResponse.json({ success: true, response: clean, model });
+    const result = await generateChatWithFallback({
+      model: model as ModelId,
+      composedPrompt: composed,
+      userPrompt: trimmedPrompt,
+      // When the fallback answers it receives the real turns, not the flattened digest.
+      history: turns,
+      ...(visionUrl ? { imageUrl: visionUrl } : {}),
+      signal: req.signal,
+    });
+
+    if (result.error) throw new Error(result.error);
+
+    const clean = stripScaffold(result.text);
+    if (!clean) throw new Error("empty response");
+
+    return NextResponse.json({
+      success: true,
+      response: clean,
+      // `model` stays what the user asked for; `answeredBy` names what actually replied.
+      model,
+      answeredBy: result.model,
+      provider: result.provider,
+      fallbackUsed: result.fallbackUsed,
+    });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Generation failed.";
-    const cancelled = /cancel/i.test(message);
-    if (cancelled) {
+    if (/cancel/i.test(message) || req.signal.aborted) {
       return NextResponse.json({ success: false, error: "Request cancelled." }, { status: 499 });
     }
     return NextResponse.json(

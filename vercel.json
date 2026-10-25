@@ -2,9 +2,17 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "functions": {
-    "src/app/api/video/route.ts": { "maxDuration": 300 },
-    "src/app/api/image/route.ts": { "maxDuration": 180 },
-    "src/app/api/chat/route.ts": { "maxDuration": 60 },
-    "src/app/api/health/route.ts": { "maxDuration": 15 }
+    "src/app/api/video/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/image/route.ts": {
+      "maxDuration": 300
+    },
+    "src/app/api/chat/route.ts": {
+      "maxDuration": 90
+    },
+    "src/app/api/health/route.ts": {
+      "maxDuration": 15
+    }
   }
 }

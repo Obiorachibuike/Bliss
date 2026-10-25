@@ -10,7 +10,9 @@ export interface TextResponse {
   raw: unknown;
 }
 
-const MODEL_ENDPOINT: Record<ModelId, string> = {
+/** Only the key-less CVRON models are addressable here; `agnes-*` ids are served by
+ *  the fallback provider (see provider.ts) and intentionally have no endpoint. */
+const MODEL_ENDPOINT: Partial<Record<ModelId, string>> = {
   llama: ENDPOINTS.chat.llama,
   "gpt-5-nano": ENDPOINTS.chat.gpt5nano,
   "gemini-2.5-flash-lite": ENDPOINTS.chat.gemini,
@@ -19,7 +21,11 @@ const MODEL_ENDPOINT: Record<ModelId, string> = {
 
 export function resolveEndpoint(model: ModelId): string {
   const url = MODEL_ENDPOINT[model];
-  if (!url) throw new Error(`Unsupported model: ${model}`);
+  if (!url) {
+    throw new Error(
+      `Model "${model}" is not served by the key-less upstream — it belongs to the fallback provider.`
+    );
+  }
   return url;
 }
 

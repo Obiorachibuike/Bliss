@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { ENDPOINTS, API_HOST } from "@/lib/api/config";
+import { ENDPOINTS, API_HOST, AGNES_CHAT_MODELS, AGNES_IMAGE_MODEL, AGNES_BASE_URL, IMAGE_MODELS, IMAGE_MODELS_WITH_FALLBACK } from "@/lib/api/config";
+import { isAgnesConfigured } from "@/lib/api/agnes";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,9 @@ async function probe(url: string): Promise<Probe> {
  * Lightweight live check of the two most important upstream capabilities.
  * Results are cached for a minute and concurrent callers share one probe, so a
  * busy app never turns into a load test against a free third-party service.
+ *
+ * The fallback provider is never probed here: a health endpoint must not burn the
+ * account's request quota, so its status is reported as configured / not configured.
  */
 async function runProbes(): Promise<ProbeResult> {
   if (cache && Date.now() - cache.at < PROBE_TTL_MS) {
@@ -52,24 +56,46 @@ async function runProbes(): Promise<ProbeResult> {
 
 export async function GET() {
   const { text, image, cached } = await runProbes();
-  const up = text.reachable || image.reachable;
+  const enabled = isAgnesConfigured();
+  // With a configured fallback provider, a down primary is no longer an outage for users.
+  const status = text.reachable || image.reachable ? "operational" : enabled ? "degraded-with-fallback" : "degraded";
 
   return NextResponse.json({
     success: true,
     provider: new URL(API_HOST).host,
-    status: up ? "operational" : "degraded",
+    status,
     checkedAt: new Date(cache?.at ?? Date.now()).toISOString(),
     cached,
     services: { text, image },
+    fallback: {
+      provider: "Agnes AI",
+      enabled,
+      vision: enabled,
+      host: (() => {
+        try {
+          return new URL(AGNES_BASE_URL).host;
+        } catch {
+          return null;
+        }
+      })(),
+      chatModels: enabled ? AGNES_CHAT_MODELS.map((m) => m.id) : [],
+      imageModel: enabled ? AGNES_IMAGE_MODEL : null,
+      note: enabled
+        ? "Configured. Used automatically when the primary provider fails after its retries; never probed here to protect your quota."
+        : "Not configured — set AGNES_API_KEY on the server to enable chat, vision and image fallbacks.",
+    },
     capabilities: {
       chat: true,
       imageGeneration: true,
       imageEditing: true,
       imageToVideo: true,
       textToVideo: false,
-      vision: false,
+      vision: enabled,
       streaming: false,
-      nativeConversationContext: false,
+      nativeConversationContext: enabled,
+    },
+    catalog: {
+      image: (enabled ? IMAGE_MODELS_WITH_FALLBACK : IMAGE_MODELS).map((m) => ({ id: m.id, provider: m.provider })),
     },
   });
 }
