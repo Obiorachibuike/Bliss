@@ -61,7 +61,7 @@ export function Sidebar({
   const sidebarCollapsed = railCollapsed && !mobileOpen;
   const setSidebar = useSettingsStore((s) => s.setSidebar);
   const defaultModel = useSettingsStore((s) => s.defaultModel);
-  const { theme, toggle } = useTheme();
+  const { toggle } = useTheme();
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
@@ -277,8 +277,10 @@ export function Sidebar({
                 aria-label="Toggle color theme"
                 className="flex items-center gap-1 rounded-full bg-white dark:bg-[#0B1220] border border-[rgba(148,163,184,0.16)] px-2.5 py-1 text-xs font-medium"
               >
-                {theme === "dark" ? <Moon className="w-3.5 h-3.5" /> : <Sun className="w-3.5 h-3.5" />}
-                {theme === "dark" ? "Dark" : "Light"}
+                <Sun className="w-3.5 h-3.5 dark:hidden" />
+                <Moon className="hidden w-3.5 h-3.5 dark:block" />
+                <span className="dark:hidden">Light</span>
+                <span className="hidden dark:inline">Dark</span>
               </button>
             </div>
             <div className="flex gap-2">
@@ -299,8 +301,9 @@ export function Sidebar({
           </>
         ) : (
           <div className="flex flex-col items-center gap-2">
-            <button onClick={toggle} className="h-8 w-8 grid place-items-center rounded-xl border border-[rgba(148,163,184,0.16)]">
-              {theme === "dark" ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+            <button onClick={toggle} aria-label="Toggle color theme" className="h-8 w-8 grid place-items-center rounded-xl border border-[rgba(148,163,184,0.16)]">
+              <Sun className="w-4 h-4 dark:hidden" />
+              <Moon className="hidden w-4 h-4 dark:block" />
             </button>
             <button onClick={() => onViewChange("settings")} className="h-8 w-8 grid place-items-center rounded-xl border border-[rgba(148,163,184,0.16)]">
               <Settings className="w-4 h-4" />
