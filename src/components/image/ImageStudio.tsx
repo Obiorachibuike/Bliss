@@ -60,9 +60,10 @@ export function ImageStudio({
   const [preview, setPreview] = useState<{ url: string; caption: string } | null>(null);
   const { images, addImage, removeImage } = useSavedStore();
 
-  const run = async () => {
+  const run = async (overridePrompt?: string) => {
+    const activePrompt = overridePrompt ?? prompt;
     setError(null);
-    if (!prompt.trim()) {
+    if (!activePrompt.trim()) {
       setError("Describe the image you'd like to create.");
       return;
     }
@@ -71,7 +72,7 @@ export function ImageStudio({
       return;
     }
     const styleSuffix = STYLES.find((s) => s.id === style)?.suffix ?? "";
-    const finalPrompt = `${prompt.trim()}${styleSuffix}${ratio !== "1:1" ? `, ${ratio} aspect ratio composition` : ""}`;
+    const finalPrompt = `${activePrompt.trim()}${styleSuffix}${ratio !== "1:1" ? `, ${ratio} aspect ratio composition` : ""}`;
 
     setBusy(true);
     const started: { id: string; url: string; prompt: string }[] = [];
@@ -231,7 +232,7 @@ export function ImageStudio({
                   </div>
                 )}
 
-                <Button onClick={run} disabled={busy} className="w-full gap-2">
+                <Button onClick={() => void run()} disabled={busy} className="w-full gap-2">
                   {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Wand2 className="h-4 w-4" />}
                   {busy ? "Generating…" : mode === "generate" ? "Generate image" : "Apply edit"}
                 </Button>
@@ -239,7 +240,7 @@ export function ImageStudio({
                 {error && (
                   <div className="rounded-xl border border-[#EF4444]/25 bg-[#EF4444]/5 px-3 py-2.5 text-xs text-[#EF4444]">
                     {error}
-                    <button onClick={run} className="ml-2 inline-flex items-center gap-1 font-semibold underline underline-offset-2">
+                    <button onClick={() => void run()} className="ml-2 inline-flex items-center gap-1 font-semibold underline underline-offset-2">
                       <RefreshCw className="h-3 w-3" /> Retry
                     </button>
                   </div>
@@ -292,7 +293,7 @@ export function ImageStudio({
                           <IconBtn label="Save to library" onClick={() => { useSavedStore.getState().addItem({ id: crypto.randomUUID?.() ?? String(Date.now()), type: "image", title: r.prompt.slice(0, 40), content: r.url, preview: r.url, createdAt: Date.now() }); toast.success("Saved"); }}>
                             <Bookmark className="h-3.5 w-3.5" />
                           </IconBtn>
-                          <IconBtn label="Regenerate" onClick={() => { setPrompt(r.prompt); run(); }}>
+                          <IconBtn label="Regenerate" onClick={() => { setPrompt(r.prompt); void run(r.prompt); }}>
                             <RefreshCw className="h-3.5 w-3.5" />
                           </IconBtn>
                         </div>
