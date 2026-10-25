@@ -295,3 +295,44 @@ describe("context prompt adapter", () => {
     expect(stripScaffold("Plain answer")).toBe("Plain answer");
   });
 });
+
+/* ------------------------------------------------------------------ */
+describe("GET /api/health", () => {
+  it("reports capability truthfully and caches the probe", async () => {
+    vi.resetModules();
+    const fetchMock = vi.fn(async () => Response.json({ success: true, response: "pong" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { GET } = await import("@/app/api/health/route");
+    const first = await (GET() as Promise<Response>);
+    const body = await first.json();
+
+    expect(body.success).toBe(true);
+    expect(body.status).toBe("operational");
+    expect(body.cached).toBe(false);
+    // Honesty checks: no capabilities we do not actually have
+    expect(body.capabilities.vision).toBe(false);
+    expect(body.capabilities.streaming).toBe(false);
+    expect(body.capabilities.textToVideo).toBe(false);
+    const probesAfterFirst = fetchMock.mock.calls.length;
+
+    const second = await (GET() as Promise<Response>);
+    const secondBody = await second.json();
+    expect(secondBody.cached).toBe(true);
+    expect(fetchMock.mock.calls.length).toBe(probesAfterFirst); // served from cache, no new upstream calls
+  });
+
+  it("degrades honestly when the provider is down", async () => {
+    vi.resetModules();
+    vi.stubGlobal("fetch", vi.fn(async () => {
+      throw new Error("socket hang up");
+    }));
+
+    const { GET } = await import("@/app/api/health/route");
+    const res = await (GET() as Promise<Response>);
+    const body = await res.json();
+    expect(body.status).toBe("degraded");
+    expect(body.services.text.reachable).toBe(false);
+    expect(body.services.image.reachable).toBe(false);
+  });
+});

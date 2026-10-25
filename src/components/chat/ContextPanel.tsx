@@ -5,7 +5,12 @@ import { MODELS, API_LIMITATIONS, ENDPOINTS } from "@/lib/api/config";
 import type { ModelId } from "@/lib/types";
 import { cn } from "@/lib/utils/cn";
 
-type Health = { status: "loading" | "operational" | "degraded"; text?: { reachable: boolean; latency: number }; image?: { reachable: boolean; latency: number } };
+type Health = {
+  status: "loading" | "operational" | "degraded";
+  checkedAt?: string;
+  text?: { reachable: boolean; latency: number };
+  image?: { reachable: boolean; latency: number };
+};
 
 export function ContextPanel({
   modelId,
@@ -29,6 +34,7 @@ export function ContextPanel({
         if (cancelled) return;
         setHealth({
           status: d.status,
+          checkedAt: d.checkedAt,
           text: d.services?.text,
           image: d.services?.image,
         });
@@ -133,7 +139,8 @@ export function ContextPanel({
               <StatusLine label="Text API" reachable={!!health.text?.reachable} latency={health.text?.latency} />
               <StatusLine label="Image API" reachable={!!health.image?.reachable} latency={health.image?.latency} />
               <p className="pt-1 text-[11px] leading-relaxed text-[#94A3B8]">
-                Live probe of <span className="font-mono">{new URL(ENDPOINTS.chat.llama).host}</span> from the server.
+                Server-side probe of <span className="font-mono">{new URL(ENDPOINTS.chat.llama).host}</span>, cached for 60s.
+                {health.checkedAt ? ` Last checked ${new Date(health.checkedAt).toLocaleTimeString()}.` : ""}
               </p>
             </div>
           )}
