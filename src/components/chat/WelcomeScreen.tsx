@@ -1,6 +1,6 @@
 "use client";
 import { MessageSquare, PenLine, Image as ImageIcon, Blocks } from "lucide-react";
-import { BlissLogo } from "@/components/layout/Logo";
+
 
 const suggestions = [
   {
@@ -44,7 +44,9 @@ export function WelcomeScreen({
   return (
     <div className="relative mx-auto flex w-full max-w-3xl flex-1 flex-col items-center justify-center px-4 py-10 sm:py-14">
       <div className="animate-breathe mb-7 grid h-16 w-16 place-items-center rounded-[22px] brand-gradient brand-glow">
-        <BlissLogo size={34} showWordmark={false} />
+        <svg viewBox="0 0 24 24" fill="none" className="h-8 w-8" aria-hidden="true">
+          <path d="M12 3L14.5 8.6L21 9.3L16.2 13.9L17.5 21L12 17.6L6.5 21L7.8 13.9L3 9.3L9.5 8.6L12 3Z" fill="white" fillOpacity="0.95" />
+        </svg>
       </div>
 
       <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-[#94A3B8]">

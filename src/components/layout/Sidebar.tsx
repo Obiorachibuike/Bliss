@@ -56,7 +56,9 @@ export function Sidebar({
 }) {
   const { conversations, activeId, createConversation, setActive, deleteConversation, togglePin } =
     useChatStore();
-  const sidebarCollapsed = useSettingsStore((s) => s.sidebarCollapsed);
+  const railCollapsed = useSettingsStore((s) => s.sidebarCollapsed);
+  // The mobile drawer is never the collapsed rail — it only has room when open.
+  const sidebarCollapsed = railCollapsed && !mobileOpen;
   const setSidebar = useSettingsStore((s) => s.setSidebar);
   const defaultModel = useSettingsStore((s) => s.defaultModel);
   const { theme, toggle } = useTheme();
