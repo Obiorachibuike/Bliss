@@ -3,10 +3,12 @@
 > **Your ideas. Infinite possibilities.**
 
 > Live deployment: **https://bliss-ai-iota.vercel.app** · production build `52cd7b7`, verified 2026-10-25.
-> `/api/models` lists the four key-less models plus `agnes-2.5-flash` and reports `fallback.enabled: false` — this
-> deployment deliberately carries no `AGNES_API_KEY`, so the fallback is documented, not silently active. `/api/health`
-> reported `status: operational` with the text upstream answering HTTP 200 and a valid JSON payload (image endpoint
-> 503 at that moment, which the app surfaces as a degraded banner rather than a fake success).
+> `/api/models` on that deployment returns the four key-less models plus `agnes-2.5-flash` and
+> `fallback: { enabled: false }` — this deployment deliberately carries no `AGNES_API_KEY`, so the fallback is
+> documented and armed, never silently active. The live probe (`/api/health`, 2026-10-25 20:26 UTC) reported `status: operational` with
+> the text upstream answering HTTP 200 and a valid JSON payload while the image endpoint answered 503 — which the
+> app surfaces as a degraded banner instead of a fake success. `/api/health` and `/api/models` now answer with
+> `Cache-Control: no-store`, so an intermediary can never serve a stale copy of either.
 
 Bliss is an all-in-one AI workspace: multi-model chat, image generation, AI image editing and image-to-video
 creation — wrapped in one blue-gradient, glass-lit interface that works on desktop, tablet and mobile.
