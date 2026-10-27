@@ -92,13 +92,16 @@ async function runProbes(): Promise<ProbeResult> {
 export async function GET() {
   const { text, image, cached } = await runProbes();
   const enabled = isAgnesConfigured();
-  // With a configured fallback provider, a down primary is no longer an outage for users.
-  const status =
-    text.reachable || image.reachable
-      ? "operational"
-      : enabled
-        ? "degraded-with-fallback"
-        : "degraded";
+  /* A surface that answers 503 is an outage for the person trying to use it, even when
+   * the other one is healthy — so "operational" means *both* probes returned a usable
+   * body. With a configured fallback provider a down primary is not the end of the
+   * request, which is what the "-with-fallback" suffix says. */
+  const allUp = text.reachable && image.reachable;
+  const status = allUp
+    ? "operational"
+    : enabled
+      ? "degraded-with-fallback"
+      : "degraded";
 
   return NextResponse.json(
     {
@@ -108,6 +111,11 @@ export async function GET() {
       checkedAt: new Date(cache?.at ?? Date.now()).toISOString(),
       cached,
       services: { text, image },
+      // The banner reads this instead of guessing from `status` alone.
+      degraded: [
+        ...(text.reachable ? [] : ["chat + video"]),
+        ...(image.reachable ? [] : ["image generation"]),
+      ],
       fallback: {
         provider: "Agnes AI",
         enabled,

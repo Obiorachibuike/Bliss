@@ -16,7 +16,10 @@ type Health = {
   text?: { reachable: boolean; latency: number };
   image?: { reachable: boolean; latency: number };
   fallbackEnabled?: boolean;
+  degraded?: string[];
 };
+
+type RowState = "yes" | "no" | "checking";
 
 export function ContextPanel({
   modelId,
@@ -55,14 +58,60 @@ export function ContextPanel({
     };
   }, []);
 
-  const rows = [
-    { label: "Text models", ok: true },
-    { label: "Image generation", ok: true },
-    { label: "Image editing", ok: true },
-    { label: "Image → video", ok: true },
-    { label: "Auto fallback", ok: fallback.enabled },
-    { label: "Vision analysis", ok: fallback.vision },
-    { label: "Streaming", ok: false },
+  /* Every row reflects something the server actually knows — a live probe for the
+   * key-less surfaces, the advertised flags for the key-gated ones. Nothing here is a
+   * standing claim that a capability works. */
+  const service = (up: boolean | undefined): RowState =>
+    health.status === "loading" ? "checking" : up ? "yes" : "no";
+
+  const rows: { label: string; state: RowState; detail: string }[] = [
+    {
+      label: "Text models",
+      state: service(health.text?.reachable),
+      detail: "Live probe of the key-less chat endpoint.",
+    },
+    {
+      label: "Image generation",
+      state: service(health.image?.reachable),
+      detail: "Live probe of the key-less image endpoint.",
+    },
+    {
+      label: "Image editing",
+      state: service(health.image?.reachable),
+      detail: "Editing is served by the same host as generation.",
+    },
+    {
+      label: "Image → video",
+      state: service(health.text?.reachable),
+      detail: "WAN 2.2 shares the text host, so it follows that probe.",
+    },
+    {
+      label: "Text → video (Agnes)",
+      state: fallback.textToVideo ? "yes" : "no",
+      detail: fallback.textToVideo
+        ? "Asynchronous Agnes task: create, then poll from the browser."
+        : "Needs AGNES_API_KEY — the key-less provider has no text-to-video endpoint.",
+    },
+    {
+      label: "Auto fallback",
+      state: fallback.enabled ? "yes" : "no",
+      detail: fallback.enabled
+        ? "A failed primary turn is retried once on Agnes AI."
+        : "Needs AGNES_API_KEY on the server.",
+    },
+    {
+      label: "Vision analysis",
+      state: fallback.vision ? "yes" : "no",
+      detail: fallback.vision
+        ? "Pasted image URLs are sent as a real image_url part."
+        : "Needs AGNES_API_KEY — no key-less endpoint accepts images.",
+    },
+    {
+      label: "Streaming",
+      state: "no",
+      detail:
+        "Not wired for either provider, so Bliss never fakes a token stream.",
+    },
   ];
 
   return (
@@ -155,11 +204,16 @@ export function ContextPanel({
             {rows.map((r) => (
               <li
                 key={r.label}
+                title={r.detail}
                 className="flex items-center justify-between text-xs"
               >
-                <span className={r.ok ? "" : "text-[#94A3B8]"}>{r.label}</span>
-                {r.ok ? (
+                <span className={r.state === "yes" ? "" : "text-[#94A3B8]"}>
+                  {r.label}
+                </span>
+                {r.state === "yes" ? (
                   <Check className="h-3.5 w-3.5 text-[#22C55E]" />
+                ) : r.state === "checking" ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-[#2563EB]" />
                 ) : (
                   <XCircle className="h-3.5 w-3.5 text-[#94A3B8]/60" />
                 )}

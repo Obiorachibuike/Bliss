@@ -525,8 +525,14 @@ const DOCS: EndpointDoc[] = [
     group: "Bliss internal",
     params: [],
     example: `fetch("/api/health").then(r => r.json())`,
-    response: `{ "status": "operational", "services": { "text": { "reachable": true, "latency": 812 }, "image": { "reachable": true, "latency": 2140 } } }`,
-    capabilities: ["Diagnostics"],
+    response: `{\n  "status": "operational",\n  "services": {\n    "text": { "reachable": true, "http": 200, "valid": true, "latency": 812 },\n    "image": { "reachable": true, "http": 200, "valid": true, "latency": 2140 }\n  },\n  "degraded": [],\n  "capabilities": { "chat": true, "textToVideo": false, "streaming": false }\n}`,
+    capabilities: [
+      "Diagnostics",
+      "operational only when both probes return a usable body",
+      "Cached for 60s",
+    ],
+    limitation:
+      "A 200 alone is not enough: the probe re-parses the body, and `degraded` names whichever surface failed. The fallback provider is never probed, so a check can't spend your quota.",
   },
   {
     key: "models-route",

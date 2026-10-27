@@ -2,13 +2,14 @@
 
 > **Your ideas. Infinite possibilities.**
 
-> Live deployment: **https://bliss-ai-iota.vercel.app** · verified 2026-10-25 (re-verified after each deploy).
-> `/api/models` on that deployment returns every key-less model plus the documented Agnes chat, image and video ids,
-> with `fallback: { enabled: false, videoModel: null, textToVideo: false }` — this deployment deliberately carries no
-> `AGNES_API_KEY`, so the optional provider is documented and armed, never silently active (its pickers stay visible
-> and explain what to set). The live probe (`/api/health`, 2026-10-25 20:26 UTC) reported `status: operational` with
-> the text upstream answering HTTP 200 and a valid JSON payload while the image endpoint answered 503 — which the
-> app surfaces as a degraded banner instead of a fake success. `/api/health` and `/api/models` now answer with
+> Live deployment: **https://bliss-ai-iota.vercel.app** · re-verified after every deploy (last: 2026-10-27 22:00 UTC).
+> `/api/models` there returns every key-less model plus the documented Agnes chat, image and video ids, with
+> `fallback: { enabled: false, videoModel: null, videoModels: [], textToVideo: false }` — this deployment deliberately
+> carries no `AGNES_API_KEY`, so the optional provider is documented and armed, never silently active (its pickers stay
+> visible and say what to set; `GET /api/video?jobId=…` answers `400` with that same guidance rather than inventing a
+> job). The live health probe is honest about partial outages too: at the check above the chat endpoint answered
+> `503` while the image endpoint answered `200`, which reports `status: "degraded"` with `degraded: ["chat + video"]`
+> — `operational` is reserved for both probes returning a usable body. `/api/health` and `/api/models` answer with
 > `Cache-Control: no-store`, so an intermediary can never serve a stale copy of either.
 
 Bliss is an all-in-one AI workspace: multi-model chat, image generation, AI image editing and video creation (both
@@ -134,7 +135,7 @@ npm run dev            # http://localhost:3000
 ```bash
 npm run build          # production build
 npm run start          # serve the production build
-npm test               # 194 unit + integration + component tests
+npm test               # 195 unit + integration + component tests
 npm run lint           # eslint
 npm run typecheck      # tsc --noEmit
 npx playwright install && npm run test:e2e   # browser suite (desktop / iPhone / iPad)
@@ -317,7 +318,7 @@ These come straight from the provider's documentation and drive real product dec
 ## Testing
 
 ```bash
-npm test                                  # 194 unit + integration + component tests
+npm test                                  # 195 unit + integration + component tests
 npm run build && npm run verify:fallback  # 34 end-to-end checks of the provider chain, offline
 ```
 
@@ -327,7 +328,7 @@ asserts the real behaviour: provider attribution, `messages` vs digest, the `ima
 the video job create/poll pair, the rules the provider answers with `400`, and honest failures with no key. No
 request ever leaves `127.0.0.1`.
 
-194 tests across nine files:
+195 tests across nine files:
 
 | Suite                                  | Covers                                                                                                                                                                                         |
 | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -335,7 +336,7 @@ request ever leaves `127.0.0.1`.
 | `test/unit/media.test.ts`              | image / edit / video / host parsing, HTML-error handling, nested payloads, non-http scheme rejection                                                                                           |
 | `test/unit/stores.test.ts`             | conversation CRUD, pin/rename/delete, per-conversation model, search, `localStorage` persistence, saved library, context adapter                                                               |
 | `test/unit/components.test.tsx`        | welcome screen, composer keys + attachment honesty, model selector, message actions, markdown/code safety, theme                                                                               |
-| `test/integration/routes.test.ts`      | `POST /api/chat`, `/api/image`, `/api/video`: allow-list, limits, rate limit, upstream outage, context folding                                                                                 |
+| `test/integration/routes.test.ts`      | 27 tests: `POST /api/chat`, `/api/image`, `/api/video`, `/api/health` — allow-list, limits, rate limit, upstream outage, partial-outage honesty, context folding                               |
 | `test/integration/agnes-video.test.ts` | 38 tests: every documented Agnes video rule (mode/media consistency, per-model sizes and ceilings, string seconds), task + status parsing, key containment, route policy and catalogue honesty |
 | `test/integration/fallback.test.ts`    | 27 tests: the whole fallback chain — retry on outage, real `messages` vs digest, vision part, explicit-model routing, image fallback payloads, secret containment, honest 502s with no key     |
 | `test/unit/fallback-ui.test.tsx`       | 15 tests: attribution badge, model picker labelling, composer vision hint, Image Studio model + tier chooser, Video Studio engine/mode picker, stop and resume watching                        |

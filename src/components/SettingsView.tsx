@@ -104,6 +104,8 @@ export function SettingsView({
     status: string;
     services?: Record<string, { reachable: boolean; latency: number }>;
     capabilities?: Record<string, boolean>;
+    degraded?: string[];
+    checkedAt?: string;
   } | null>(null);
 
   useEffect(() => {
@@ -504,8 +506,15 @@ export function SettingsView({
             </div>
             <p className="mt-3 text-[11px] leading-relaxed text-[#94A3B8]">
               {status?.status === "operational"
-                ? "The provider responded to the health probe from the server."
-                : "The provider didn't answer the health probe. This is common for free public endpoints — generations are retried automatically and failures are reported honestly instead of faked."}
+                ? "Both probed surfaces answered the server-side health probe with a usable body."
+                : status?.status === "degraded-with-fallback"
+                  ? `Part of the free provider is not answering${status.degraded?.length ? ` (${status.degraded.join(", ")})` : ""}. Agnes AI carries those turns when you pick an Agnes model, and failures are reported instead of faked.`
+                  : status?.degraded?.length
+                    ? `Not answering the probe: ${status.degraded.join(", ")}. This is common for free public endpoints — requests are retried once and failures are reported honestly instead of faked.`
+                    : "The provider didn't answer the health probe. This is common for free public endpoints — generations are retried automatically and failures are reported honestly instead of faked."}
+              {status?.checkedAt
+                ? ` Probed ${new Date(status.checkedAt).toLocaleTimeString()}.`
+                : ""}
             </p>
           </Section>
 
