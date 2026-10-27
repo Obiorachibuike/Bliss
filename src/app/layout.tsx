@@ -15,7 +15,8 @@ export const metadata: Metadata = {
   applicationName: "Bliss",
   openGraph: {
     title: "Bliss — AI Workspace",
-    description: "Chat, create images and generate video with one blue-glass AI workspace.",
+    description:
+      "Chat, create images and generate video with one blue-glass AI workspace.",
     type: "website",
   },
 };
@@ -33,7 +34,9 @@ export const viewport: Viewport = {
 // Applies the persisted theme before paint to avoid a flash of the wrong palette.
 const themeInit = `(function(){try{var r=JSON.parse(localStorage.getItem('bliss-settings-storage')||'{}');var t=(r&&r.state&&r.state.theme)||'dark';if(t==='system'){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}var d=document.documentElement;d.classList.toggle('dark',t==='dark');d.classList.toggle('light',t==='light');d.setAttribute('data-theme',t);}catch(e){document.documentElement.classList.add('dark');}})();`;
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>

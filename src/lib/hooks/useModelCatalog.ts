@@ -5,7 +5,11 @@
  * shares the answer with every consumer. When the answer matches the build-time
  * defaults nothing is emitted, so components never re-render for no reason. */
 import { useSyncExternalStore } from "react";
-import { MODELS_WITH_FALLBACK, IMAGE_MODELS_WITH_FALLBACK } from "@/lib/api/config";
+import {
+  MODELS_WITH_FALLBACK,
+  IMAGE_MODELS_WITH_FALLBACK,
+  VIDEO_MODELS_WITH_FALLBACK,
+} from "@/lib/api/config";
 import type { ModelId } from "@/lib/types";
 
 export interface FallbackStatus {
@@ -15,6 +19,10 @@ export interface FallbackStatus {
   nativeConversationContext: boolean;
   chatModels: string[];
   imageModel: string | null;
+  /** Video is the provider's async task API: no key means no video fallback at all. */
+  videoModel: string | null;
+  videoModels: string[];
+  textToVideo: boolean;
   docs: string;
 }
 
@@ -25,14 +33,19 @@ const INITIAL_FALLBACK: FallbackStatus = {
   nativeConversationContext: false,
   chatModels: [],
   imageModel: null,
+  videoModel: null,
+  videoModels: [],
+  textToVideo: false,
   docs: "https://www.agnes-ai.com/en/docs",
 };
 
 type TextModels = typeof MODELS_WITH_FALLBACK;
 type ImageModels = typeof IMAGE_MODELS_WITH_FALLBACK;
+type VideoModels = typeof VIDEO_MODELS_WITH_FALLBACK;
 
 let textModels: TextModels = MODELS_WITH_FALLBACK;
 let imageModels: ImageModels = IMAGE_MODELS_WITH_FALLBACK;
+let videoModels: VideoModels = VIDEO_MODELS_WITH_FALLBACK;
 let fallbackStatus: FallbackStatus = INITIAL_FALLBACK;
 
 const listeners = new Set<() => void>();
@@ -43,7 +56,8 @@ function emit() {
   for (const l of listeners) l();
 }
 
-const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
+const same = (a: unknown, b: unknown) =>
+  JSON.stringify(a) === JSON.stringify(b);
 
 async function fetchCatalog() {
   try {
@@ -52,11 +66,24 @@ async function fetchCatalog() {
     const data = (await res.json()) as {
       text?: TextModels;
       image?: ImageModels;
+      video?: VideoModels;
       fallback?: Partial<FallbackStatus>;
     };
-    const nextText = Array.isArray(data.text) && data.text.length > 0 ? data.text : MODELS_WITH_FALLBACK;
-    const nextImage = Array.isArray(data.image) && data.image.length > 0 ? data.image : IMAGE_MODELS_WITH_FALLBACK;
-    const nextFallback: FallbackStatus = data.fallback ? { ...INITIAL_FALLBACK, ...data.fallback } : INITIAL_FALLBACK;
+    const nextText =
+      Array.isArray(data.text) && data.text.length > 0
+        ? data.text
+        : MODELS_WITH_FALLBACK;
+    const nextImage =
+      Array.isArray(data.image) && data.image.length > 0
+        ? data.image
+        : IMAGE_MODELS_WITH_FALLBACK;
+    const nextVideo =
+      Array.isArray(data.video) && data.video.length > 0
+        ? data.video
+        : VIDEO_MODELS_WITH_FALLBACK;
+    const nextFallback: FallbackStatus = data.fallback
+      ? { ...INITIAL_FALLBACK, ...data.fallback }
+      : INITIAL_FALLBACK;
 
     settled = true;
     let changed = false;
@@ -66,6 +93,10 @@ async function fetchCatalog() {
     }
     if (!same(nextImage, imageModels)) {
       imageModels = nextImage;
+      changed = true;
+    }
+    if (!same(nextVideo, videoModels)) {
+      videoModels = nextVideo;
       changed = true;
     }
     if (!same(nextFallback, fallbackStatus)) {
@@ -94,18 +125,41 @@ function subscribe(cb: () => void) {
 /* Fallback-provider models stay listed even when the key is absent — the route
  * answers with a clear "not enabled" error instead of pretending they don't exist. */
 export function useTextModels(): TextModels {
-  return useSyncExternalStore(subscribe, () => textModels, () => MODELS_WITH_FALLBACK);
+  return useSyncExternalStore(
+    subscribe,
+    () => textModels,
+    () => MODELS_WITH_FALLBACK,
+  );
 }
 
 export function useImageModels(): ImageModels {
-  return useSyncExternalStore(subscribe, () => imageModels, () => IMAGE_MODELS_WITH_FALLBACK);
+  return useSyncExternalStore(
+    subscribe,
+    () => imageModels,
+    () => IMAGE_MODELS_WITH_FALLBACK,
+  );
+}
+
+export function useVideoModels(): VideoModels {
+  return useSyncExternalStore(
+    subscribe,
+    () => videoModels,
+    () => VIDEO_MODELS_WITH_FALLBACK,
+  );
 }
 
 export function useFallbackStatus(): FallbackStatus {
-  return useSyncExternalStore(subscribe, () => fallbackStatus, () => INITIAL_FALLBACK);
+  return useSyncExternalStore(
+    subscribe,
+    () => fallbackStatus,
+    () => INITIAL_FALLBACK,
+  );
 }
 
-export function modelLabel(id: ModelId, models: TextModels = MODELS_WITH_FALLBACK): string {
+export function modelLabel(
+  id: ModelId,
+  models: TextModels = MODELS_WITH_FALLBACK,
+): string {
   return models.find((m) => m.id === id)?.name ?? id;
 }
 
@@ -124,6 +178,7 @@ export function catalogReady() {
 export function __resetCatalogForTests() {
   textModels = MODELS_WITH_FALLBACK;
   imageModels = IMAGE_MODELS_WITH_FALLBACK;
+  videoModels = VIDEO_MODELS_WITH_FALLBACK;
   fallbackStatus = INITIAL_FALLBACK;
   settled = false;
   inflight = null;

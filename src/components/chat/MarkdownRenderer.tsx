@@ -2,7 +2,10 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { oneDark, oneLight } from "react-syntax-highlighter/dist/esm/styles/prism";
+import {
+  oneDark,
+  oneLight,
+} from "react-syntax-highlighter/dist/esm/styles/prism";
 import { useTheme } from "@/components/layout/ThemeProvider";
 import { useSettingsStore } from "@/lib/store/settingsStore";
 import { Copy, Check } from "lucide-react";
@@ -39,12 +42,24 @@ export function MarkdownRenderer({ content }: { content: string }) {
         components={{
           h1: (p) => <h1 className="mt-6 mb-3 text-xl font-bold" {...p} />,
           h2: (p) => <h2 className="mt-5 mb-2 text-lg font-semibold" {...p} />,
-          h3: (p) => <h3 className="mt-4 mb-2 text-base font-semibold" {...p} />,
-          p: (p) => <p className="my-2 leading-7 text-slate-700 dark:text-slate-300" {...p} />,
+          h3: (p) => (
+            <h3 className="mt-4 mb-2 text-base font-semibold" {...p} />
+          ),
+          p: (p) => (
+            <p
+              className="my-2 leading-7 text-slate-700 dark:text-slate-300"
+              {...p}
+            />
+          ),
           ul: (p) => <ul className="my-2 list-disc space-y-1 pl-6" {...p} />,
           ol: (p) => <ol className="my-2 list-decimal space-y-1 pl-6" {...p} />,
           li: (p) => <li className="leading-relaxed" {...p} />,
-          strong: (p) => <strong className="font-semibold text-slate-900 dark:text-white" {...p} />,
+          strong: (p) => (
+            <strong
+              className="font-semibold text-slate-900 dark:text-white"
+              {...p}
+            />
+          ),
           blockquote: (p) => (
             <blockquote
               className="my-3 rounded-r-lg border-l-2 border-[#2563EB]/40 bg-[#2563EB]/5 py-2 pl-4 italic dark:bg-[#2563EB]/10"
@@ -56,8 +71,18 @@ export function MarkdownRenderer({ content }: { content: string }) {
               <table className="min-w-full text-sm" {...p} />
             </div>
           ),
-          th: (p) => <th className="bg-slate-50 px-3 py-2 text-left font-semibold dark:bg-white/5" {...p} />,
-          td: (p) => <td className="border-t border-[rgba(148,163,184,0.12)] px-3 py-2" {...p} />,
+          th: (p) => (
+            <th
+              className="bg-slate-50 px-3 py-2 text-left font-semibold dark:bg-white/5"
+              {...p}
+            />
+          ),
+          td: (p) => (
+            <td
+              className="border-t border-[rgba(148,163,184,0.12)] px-3 py-2"
+              {...p}
+            />
+          ),
           a: (p) => (
             <a
               className="text-[#2563EB] underline decoration-[#2563EB]/30 underline-offset-2 hover:text-[#3B82F6] dark:text-[#60A5FA]"
@@ -87,12 +112,18 @@ export function MarkdownRenderer({ content }: { content: string }) {
             return (
               <div className="group/code my-3 overflow-hidden rounded-xl border border-[rgba(148,163,184,0.16)]">
                 <div className="flex items-center justify-between border-b border-[rgba(148,163,184,0.12)] bg-[#F8FAFC] px-3 py-1.5 dark:bg-[#0B1220]">
-                  <span className="font-mono text-xs text-[#94A3B8]">{lang}</span>
+                  <span className="font-mono text-xs text-[#94A3B8]">
+                    {lang}
+                  </span>
                   <button
                     onClick={() => handleCopy(codeText, id)}
                     className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-[#94A3B8] transition hover:bg-black/5 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"
                   >
-                    {copied === id ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                    {copied === id ? (
+                      <Check className="h-3 w-3" />
+                    ) : (
+                      <Copy className="h-3 w-3" />
+                    )}
                     {copied === id ? "Copied" : "Copy"}
                   </button>
                 </div>
@@ -100,7 +131,12 @@ export function MarkdownRenderer({ content }: { content: string }) {
                   language={lang}
                   PreTag="div"
                   style={theme === "dark" ? oneDark : oneLight}
-                  customStyle={{ margin: 0, borderRadius: 0, fontSize: "13px", padding: "12px" }}
+                  customStyle={{
+                    margin: 0,
+                    borderRadius: 0,
+                    fontSize: "13px",
+                    padding: "12px",
+                  }}
                 >
                   {codeText}
                 </SyntaxHighlighter>

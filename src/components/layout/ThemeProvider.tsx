@@ -1,5 +1,11 @@
 "use client";
-import { createContext, useCallback, useContext, useEffect, useSyncExternalStore } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useSyncExternalStore,
+} from "react";
 import { useSettingsStore } from "@/lib/store/settingsStore";
 
 export type Theme = "light" | "dark";
@@ -33,9 +39,14 @@ const getServerSnapshot = () => true; // matches the pre-paint default applied b
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const preference = useSettingsStore((s) => s.theme);
   const setPreference = useSettingsStore((s) => s.setTheme);
-  const systemDark = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
+  const systemDark = useSyncExternalStore(
+    subscribe,
+    getSnapshot,
+    getServerSnapshot,
+  );
 
-  const theme: Theme = preference === "system" ? (systemDark ? "dark" : "light") : preference;
+  const theme: Theme =
+    preference === "system" ? (systemDark ? "dark" : "light") : preference;
 
   // Single place that mutates <html>, so React renders stay pure.
   useEffect(() => {
@@ -46,10 +57,20 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     el.style.colorScheme = theme;
   }, [theme]);
 
-  const setTheme = useCallback((t: ThemePreference) => setPreference(t), [setPreference]);
-  const toggle = useCallback(() => setPreference(theme === "dark" ? "light" : "dark"), [setPreference, theme]);
+  const setTheme = useCallback(
+    (t: ThemePreference) => setPreference(t),
+    [setPreference],
+  );
+  const toggle = useCallback(
+    () => setPreference(theme === "dark" ? "light" : "dark"),
+    [setPreference, theme],
+  );
 
-  return <ThemeCtx.Provider value={{ theme, preference, toggle, setTheme }}>{children}</ThemeCtx.Provider>;
+  return (
+    <ThemeCtx.Provider value={{ theme, preference, toggle, setTheme }}>
+      {children}
+    </ThemeCtx.Provider>
+  );
 }
 
 export const useTheme = () => useContext(ThemeCtx);

@@ -12,8 +12,10 @@ Object.defineProperty(window, "matchMedia", {
     matches: false,
     media: query,
     onchange: null,
-    addEventListener: (_: string, cb: (e: { matches: boolean }) => void) => listeners.add(cb),
-    removeEventListener: (_: string, cb: (e: { matches: boolean }) => void) => listeners.delete(cb),
+    addEventListener: (_: string, cb: (e: { matches: boolean }) => void) =>
+      listeners.add(cb),
+    removeEventListener: (_: string, cb: (e: { matches: boolean }) => void) =>
+      listeners.delete(cb),
     addListener: () => {},
     removeListener: () => {},
     dispatchEvent: () => true,

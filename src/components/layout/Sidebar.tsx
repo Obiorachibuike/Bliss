@@ -31,12 +31,25 @@ import { Input } from "@/components/ui/input";
 import { relativeTime } from "@/lib/utils/title";
 import { cn } from "@/lib/utils/cn";
 
-type NavItem = { id: string; label: string; icon: React.ReactNode; badge?: string };
+type NavItem = {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  badge?: string;
+};
 
 const navItems: NavItem[] = [
   { id: "chat", label: "Chat", icon: <MessageSquare className="w-4 h-4" /> },
-  { id: "explore", label: "Explore Models", icon: <Compass className="w-4 h-4" /> },
-  { id: "image", label: "Image Studio", icon: <ImageIcon className="w-4 h-4" /> },
+  {
+    id: "explore",
+    label: "Explore Models",
+    icon: <Compass className="w-4 h-4" />,
+  },
+  {
+    id: "image",
+    label: "Image Studio",
+    icon: <ImageIcon className="w-4 h-4" />,
+  },
   { id: "video", label: "Video Studio", icon: <Video className="w-4 h-4" /> },
   { id: "saved", label: "Saved", icon: <Bookmark className="w-4 h-4" /> },
   { id: "history", label: "History", icon: <History className="w-4 h-4" /> },
@@ -54,8 +67,14 @@ export function Sidebar({
   mobileOpen: boolean;
   setMobileOpen: (v: boolean) => void;
 }) {
-  const { conversations, activeId, createConversation, setActive, deleteConversation, togglePin } =
-    useChatStore();
+  const {
+    conversations,
+    activeId,
+    createConversation,
+    setActive,
+    deleteConversation,
+    togglePin,
+  } = useChatStore();
   const railCollapsed = useSettingsStore((s) => s.sidebarCollapsed);
   // The mobile drawer is never the collapsed rail — it only has room when open.
   const sidebarCollapsed = railCollapsed && !mobileOpen;
@@ -85,9 +104,15 @@ export function Sidebar({
     .filter((c) => {
       if (!search.trim()) return true;
       const q = search.toLowerCase();
-      return c.title.toLowerCase().includes(q) || c.messages.some((m) => m.content.toLowerCase().includes(q));
+      return (
+        c.title.toLowerCase().includes(q) ||
+        c.messages.some((m) => m.content.toLowerCase().includes(q))
+      );
     })
-    .sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.updatedAt - a.updatedAt);
+    .sort(
+      (a, b) =>
+        (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0) || b.updatedAt - a.updatedAt,
+    );
 
   const sidebarContent = (
     <div className="flex h-full flex-col">
@@ -99,7 +124,11 @@ export function Sidebar({
           className="hidden lg:flex h-7 w-7 items-center justify-center rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#94A3B8]"
           aria-label="Toggle sidebar"
         >
-          {sidebarCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+          {sidebarCollapsed ? (
+            <PanelLeftOpen className="w-4 h-4" />
+          ) : (
+            <PanelLeftClose className="w-4 h-4" />
+          )}
         </button>
         <button
           onClick={() => setMobileOpen(false)}
@@ -147,7 +176,7 @@ export function Sidebar({
               activeView === item.id
                 ? "bg-[linear-gradient(135deg,#2563EB_0%,#3B82F6_45%,#60A5FA_100%)] text-white shadow-md"
                 : "text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5",
-              sidebarCollapsed && "justify-center px-2"
+              sidebarCollapsed && "justify-center px-2",
             )}
             title={sidebarCollapsed ? item.label : undefined}
           >
@@ -161,8 +190,12 @@ export function Sidebar({
       {!sidebarCollapsed && (
         <div className="mt-4 flex flex-1 flex-col overflow-hidden border-t border-[rgba(148,163,184,0.12)] pt-4">
           <div className="px-3 pb-2 flex items-center justify-between">
-            <span className="text-xs font-semibold tracking-widest uppercase text-[#94A3B8]">Recent</span>
-            <span className="text-xs text-[#94A3B8]">{conversations.length}</span>
+            <span className="text-xs font-semibold tracking-widest uppercase text-[#94A3B8]">
+              Recent
+            </span>
+            <span className="text-xs text-[#94A3B8]">
+              {conversations.length}
+            </span>
           </div>
 
           <div className="px-3 pb-2">
@@ -178,7 +211,11 @@ export function Sidebar({
           </div>
 
           <div className="flex-1 overflow-y-auto px-2 space-y-1 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-white/10">
-            {filtered.length === 0 && <p className="px-3 py-6 text-xs text-center text-[#94A3B8]">No conversations yet</p>}
+            {filtered.length === 0 && (
+              <p className="px-3 py-6 text-xs text-center text-[#94A3B8]">
+                No conversations yet
+              </p>
+            )}
             {filtered.map((c) => (
               <div
                 key={c.id}
@@ -186,7 +223,7 @@ export function Sidebar({
                   "group flex flex-col gap-1 rounded-xl px-3 py-2.5 cursor-pointer transition-all border",
                   activeId === c.id
                     ? "bg-[#F0F7FF] dark:bg-[#132034] border-[#2563EB]/20"
-                    : "border-transparent hover:bg-slate-50 dark:hover:bg-white/5"
+                    : "border-transparent hover:bg-slate-50 dark:hover:bg-white/5",
                 )}
                 onClick={() => {
                   setActive(c.id);
@@ -201,13 +238,18 @@ export function Sidebar({
                       onChange={(e) => setEditTitle(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
-                          useChatStore.getState().renameConversation(c.id, editTitle);
+                          useChatStore
+                            .getState()
+                            .renameConversation(c.id, editTitle);
                           setEditingId(null);
                         }
                         if (e.key === "Escape") setEditingId(null);
                       }}
                       onBlur={() => {
-                        if (editTitle.trim()) useChatStore.getState().renameConversation(c.id, editTitle);
+                        if (editTitle.trim())
+                          useChatStore
+                            .getState()
+                            .renameConversation(c.id, editTitle);
                         setEditingId(null);
                       }}
                       className="h-6 text-xs"
@@ -219,10 +261,14 @@ export function Sidebar({
                       {c.title}
                     </p>
                   )}
-                  {c.pinned && <Pin className="w-3 h-3 text-[#2563EB] shrink-0 mt-0.5" />}
+                  {c.pinned && (
+                    <Pin className="w-3 h-3 text-[#2563EB] shrink-0 mt-0.5" />
+                  )}
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-[#94A3B8]">{relativeTime(c.updatedAt)} • {c.messages.length} msgs</span>
+                  <span className="text-xs text-[#94A3B8]">
+                    {relativeTime(c.updatedAt)} • {c.messages.length} msgs
+                  </span>
                   <div className="hidden group-hover:flex items-center gap-1">
                     <button
                       onClick={(e) => {
@@ -297,15 +343,24 @@ export function Sidebar({
                 <HelpCircle className="w-3.5 h-3.5" /> Help
               </button>
             </div>
-            <p className="text-[10px] text-center text-[#94A3B8]">Bliss v1.0 • Free AI APIs</p>
+            <p className="text-[10px] text-center text-[#94A3B8]">
+              Bliss v1.0 • Free AI APIs
+            </p>
           </>
         ) : (
           <div className="flex flex-col items-center gap-2">
-            <button onClick={toggle} aria-label="Toggle color theme" className="h-8 w-8 grid place-items-center rounded-xl border border-[rgba(148,163,184,0.16)]">
+            <button
+              onClick={toggle}
+              aria-label="Toggle color theme"
+              className="h-8 w-8 grid place-items-center rounded-xl border border-[rgba(148,163,184,0.16)]"
+            >
               <Sun className="w-4 h-4 dark:hidden" />
               <Moon className="hidden w-4 h-4 dark:block" />
             </button>
-            <button onClick={() => onViewChange("settings")} className="h-8 w-8 grid place-items-center rounded-xl border border-[rgba(148,163,184,0.16)]">
+            <button
+              onClick={() => onViewChange("settings")}
+              className="h-8 w-8 grid place-items-center rounded-xl border border-[rgba(148,163,184,0.16)]"
+            >
               <Settings className="w-4 h-4" />
             </button>
           </div>
@@ -321,15 +376,23 @@ export function Sidebar({
         aria-label="Primary"
         className={cn(
           "hidden lg:flex flex-col shrink-0 border-r border-[rgba(148,163,184,0.12)] bg-[#F7FAFF]/80 dark:bg-[#080D18]/80 backdrop-blur-xl transition-all duration-300",
-          sidebarCollapsed ? "w-[72px]" : "w-[300px]"
+          sidebarCollapsed ? "w-[72px]" : "w-[300px]",
         )}
       >
         {sidebarContent}
       </aside>
       {/* Mobile drawer */}
       {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label="Bliss navigation">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+        <div
+          className="lg:hidden fixed inset-0 z-50 flex"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Bliss navigation"
+        >
+          <div
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            onClick={() => setMobileOpen(false)}
+          />
           <div className="relative w-[300px] bg-[#F7FAFF] dark:bg-[#080D18] h-full overflow-hidden shadow-2xl">
             {sidebarContent}
           </div>

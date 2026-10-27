@@ -22,7 +22,12 @@
   --background: #f7faff;
   --foreground: #0b1220;
   --surface: #ffffff;
-  --gradient-brand: linear-gradient(135deg, #2563eb 0%, #3b82f6 45%, #60a5fa 100%);
+  --gradient-brand: linear-gradient(
+    135deg,
+    #2563eb 0%,
+    #3b82f6 45%,
+    #60a5fa 100%
+  );
 }
 
 .dark {
@@ -42,8 +47,11 @@
   --color-muted: var(--text-sec);
   --color-success: var(--success);
   --color-error: var(--error);
-  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-mono: "Geist Mono Variable", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-sans:
+    "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --font-mono:
+    "Geist Mono Variable", ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 
 * {
@@ -118,7 +126,9 @@ body {
   color: transparent;
 }
 .brand-glow {
-  box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.12), 0 18px 60px -18px rgba(37, 99, 235, 0.55);
+  box-shadow:
+    0 0 0 1px rgba(37, 99, 235, 0.12),
+    0 18px 60px -18px rgba(37, 99, 235, 0.55);
 }
 
 /* Focus visibility */

@@ -24,8 +24,15 @@ describe("welcome screen", () => {
     render(wrap(<WelcomeScreen onPick={vi.fn()} />));
     const heading = screen.getByRole("heading", { level: 1 });
     expect(heading.textContent).toBe("What can we create today?");
-    expect(screen.getByText(/Ask anything, explore ideas, generate images/i)).toBeInTheDocument();
-    for (const label of ["Ask anything", "Write something", "Create an image", "Build something"]) {
+    expect(
+      screen.getByText(/Ask anything, explore ideas, generate images/i),
+    ).toBeInTheDocument();
+    for (const label of [
+      "Ask anything",
+      "Write something",
+      "Create an image",
+      "Build something",
+    ]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
     expect(screen.getAllByRole("button")).toHaveLength(4);
@@ -35,17 +42,33 @@ describe("welcome screen", () => {
     const onPick = vi.fn();
     render(wrap(<WelcomeScreen onPick={onPick} />));
     await userEvent.click(screen.getByText("Ask anything").closest("button")!);
-    expect(onPick).toHaveBeenCalledWith(expect.stringMatching(/understand/i), false);
+    expect(onPick).toHaveBeenCalledWith(
+      expect.stringMatching(/understand/i),
+      false,
+    );
 
-    await userEvent.click(screen.getByText("Create an image").closest("button")!);
-    expect(onPick).toHaveBeenCalledWith(expect.stringMatching(/cinematic/i), true);
+    await userEvent.click(
+      screen.getByText("Create an image").closest("button")!,
+    );
+    expect(onPick).toHaveBeenCalledWith(
+      expect.stringMatching(/cinematic/i),
+      true,
+    );
   });
 });
 
 describe("composer", () => {
   it("sends on Enter and keeps Shift+Enter as a newline", async () => {
     const onSend = vi.fn();
-    render(wrap(<Composer onSend={onSend} selectedModel="llama" onModelChange={vi.fn()} />));
+    render(
+      wrap(
+        <Composer
+          onSend={onSend}
+          selectedModel="llama"
+          onModelChange={vi.fn()}
+        />,
+      ),
+    );
     const box = screen.getByRole("textbox", { name: /message bliss/i });
 
     await userEvent.type(box, "first line");
@@ -61,7 +84,15 @@ describe("composer", () => {
   it("respects the enter-to-send preference", async () => {
     useSettingsStore.setState({ enterToSend: false });
     const onSend = vi.fn();
-    render(wrap(<Composer onSend={onSend} selectedModel="llama" onModelChange={vi.fn()} />));
+    render(
+      wrap(
+        <Composer
+          onSend={onSend}
+          selectedModel="llama"
+          onModelChange={vi.fn()}
+        />,
+      ),
+    );
     const box = screen.getByRole("textbox", { name: /message bliss/i });
     await userEvent.type(box, "hello");
     fireEvent.keyDown(box, { key: "Enter" });
@@ -72,19 +103,43 @@ describe("composer", () => {
 
   it("never sends an empty message and shows a stop control while streaming", () => {
     const onSend = vi.fn();
-    const { rerender } = render(wrap(<Composer onSend={onSend} selectedModel="llama" onModelChange={vi.fn()} />));
-    expect(screen.getByRole("button", { name: /send message/i })).toBeDisabled();
+    const { rerender } = render(
+      wrap(
+        <Composer
+          onSend={onSend}
+          selectedModel="llama"
+          onModelChange={vi.fn()}
+        />,
+      ),
+    );
+    expect(
+      screen.getByRole("button", { name: /send message/i }),
+    ).toBeDisabled();
     rerender(
       wrap(
-        <Composer onSend={onSend} onStop={vi.fn()} isStreaming selectedModel="llama" onModelChange={vi.fn()} />
-      )
+        <Composer
+          onSend={onSend}
+          onStop={vi.fn()}
+          isStreaming
+          selectedModel="llama"
+          onModelChange={vi.fn()}
+        />,
+      ),
     );
     expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument();
   });
 
   it("changes the model that the next request will use", async () => {
     const onModelChange = vi.fn();
-    render(wrap(<Composer onSend={vi.fn()} selectedModel="llama" onModelChange={onModelChange} />));
+    render(
+      wrap(
+        <Composer
+          onSend={vi.fn()}
+          selectedModel="llama"
+          onModelChange={onModelChange}
+        />,
+      ),
+    );
     await userEvent.click(screen.getByRole("button", { name: /llama 3.3/i }));
     await userEvent.click(await screen.findByText("DeepSeek V3.2"));
     expect(onModelChange).toHaveBeenCalledWith("deepseek-v3.2");
@@ -92,23 +147,46 @@ describe("composer", () => {
 
   it("adds an image reference without pretending the model can see it", async () => {
     const onSend = vi.fn();
-    render(wrap(<Composer onSend={onSend} selectedModel="llama" onModelChange={vi.fn()} />));
-    await userEvent.click(screen.getByRole("button", { name: /attach an image reference/i }));
+    render(
+      wrap(
+        <Composer
+          onSend={onSend}
+          selectedModel="llama"
+          onModelChange={vi.fn()}
+        />,
+      ),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /attach an image reference/i }),
+    );
     expect(screen.getByText(/accept text only/i)).toBeInTheDocument();
-    await userEvent.type(screen.getByPlaceholderText(/https:\/\/example\.com\/photo\.jpg/i), "https://cdn.test/a.jpg");
+    await userEvent.type(
+      screen.getByPlaceholderText(/https:\/\/example\.com\/photo\.jpg/i),
+      "https://cdn.test/a.jpg",
+    );
     await userEvent.click(screen.getByRole("button", { name: "Add" }));
-    await userEvent.click(screen.getByRole("button", { name: /send message/i }));
-    expect(onSend).toHaveBeenCalledWith(expect.stringContaining("![reference image](https://cdn.test/a.jpg)"));
+    await userEvent.click(
+      screen.getByRole("button", { name: /send message/i }),
+    );
+    expect(onSend).toHaveBeenCalledWith(
+      expect.stringContaining("![reference image](https://cdn.test/a.jpg)"),
+    );
   });
 });
 
 describe("message list", () => {
   const msgs = [
-    { id: "u1", role: "user" as const, content: "Explain recursion", timestamp: 1 },
+    {
+      id: "u1",
+      role: "user" as const,
+      content: "Explain recursion",
+      timestamp: 1,
+    },
     {
       id: "a1",
       role: "assistant" as const,
-      content: "Recursion means **a function that calls itself**.\n\n```python\ndef f(n):\n    return f(n - 1)\n```",
+      content:
+        "Recursion means **a function that calls itself**.\n\n```python\ndef f(n):\n    return f(n - 1)\n```",
       timestamp: 2,
       modelId: "llama" as const,
     },
@@ -122,7 +200,10 @@ describe("message list", () => {
   });
 
   it("shows the streaming indicator only for the pending message", () => {
-    const withPending = [...msgs, { id: "a2", role: "assistant" as const, content: "", timestamp: 3 }];
+    const withPending = [
+      ...msgs,
+      { id: "a2", role: "assistant" as const, content: "", timestamp: 3 },
+    ];
     render(wrap(<MessageList messages={withPending} streamingId="a2" />));
     expect(screen.getByText(/thinking/i)).toBeInTheDocument();
   });
@@ -131,20 +212,34 @@ describe("message list", () => {
     render(
       wrap(
         <MessageList
-          messages={[...msgs, { id: "a2", role: "assistant", content: "", timestamp: 3, error: "Service unavailable" }]}
-        />
-      )
+          messages={[
+            ...msgs,
+            {
+              id: "a2",
+              role: "assistant",
+              content: "",
+              timestamp: 3,
+              error: "Service unavailable",
+            },
+          ]}
+        />,
+      ),
     );
     expect(screen.getByText("Service unavailable")).toBeInTheDocument();
   });
 
   it("copies a message to the clipboard", async () => {
     const writeText = vi.fn(async () => undefined);
-    Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
     render(wrap(<MessageList messages={msgs} />));
     fireEvent.mouseEnter(screen.getByText("Explain recursion"));
     await userEvent.click(screen.getAllByRole("button", { name: /copy/i })[0]);
-    await waitFor(() => expect(writeText).toHaveBeenCalledWith("Explain recursion"));
+    await waitFor(() =>
+      expect(writeText).toHaveBeenCalledWith("Explain recursion"),
+    );
   });
 
   it("regenerates a chosen assistant reply", async () => {
@@ -158,10 +253,14 @@ describe("message list", () => {
     const onEdit = vi.fn();
     render(wrap(<MessageList messages={msgs} onEditMessage={onEdit} />));
     await userEvent.click(screen.getByRole("button", { name: /edit/i }));
-    const area = screen.getByRole("textbox", { hidden: false }) as HTMLTextAreaElement;
+    const area = screen.getByRole("textbox", {
+      hidden: false,
+    }) as HTMLTextAreaElement;
     await userEvent.clear(area);
     await userEvent.type(area, "Explain iteration");
-    await userEvent.click(screen.getByRole("button", { name: /save & resend/i }));
+    await userEvent.click(
+      screen.getByRole("button", { name: /save & resend/i }),
+    );
     expect(onEdit).toHaveBeenCalledWith("u1", "Explain iteration");
   });
 });
@@ -178,7 +277,9 @@ describe("markdown rendering", () => {
 
   it("renders fenced code with a language label and never executes it", () => {
     const { container } = render(
-      <MarkdownRenderer content={'```js\nconst x = 1;\n<img src=x onerror="alert(1)">\n```'} />
+      <MarkdownRenderer
+        content={'```js\nconst x = 1;\n<img src=x onerror="alert(1)">\n```'}
+      />,
     );
     expect(container.textContent).toContain("const x = 1;");
     expect(container.querySelector("img")).toBeNull(); // raw HTML is not turned into markup
@@ -187,7 +288,9 @@ describe("markdown rendering", () => {
   });
 
   it("links open safely in a new tab", () => {
-    const { container } = render(<MarkdownRenderer content="[docs](https://example.com)" />);
+    const { container } = render(
+      <MarkdownRenderer content="[docs](https://example.com)" />,
+    );
     const a = container.querySelector("a")!;
     expect(a).toHaveAttribute("target", "_blank");
     expect(a).toHaveAttribute("rel", expect.stringContaining("noopener"));
@@ -199,13 +302,19 @@ describe("theme", () => {
     render(wrap(<div data-testid="x" />));
     expect(document.documentElement.classList.contains("dark")).toBe(true);
     fireEvent.click(screen.getByTestId("x")); // noop, ensures mounted
-    await waitFor(() => expect(document.documentElement.getAttribute("data-theme")).toBe("dark"));
+    await waitFor(() =>
+      expect(document.documentElement.getAttribute("data-theme")).toBe("dark"),
+    );
   });
 
   it("honours an explicit light preference and persists it", async () => {
     useSettingsStore.setState({ theme: "light" });
     render(wrap(<div />));
-    await waitFor(() => expect(document.documentElement.classList.contains("dark")).toBe(false));
-    expect(JSON.parse(localStorage.getItem("bliss-settings-storage")!).state.theme).toBe("light");
+    await waitFor(() =>
+      expect(document.documentElement.classList.contains("dark")).toBe(false),
+    );
+    expect(
+      JSON.parse(localStorage.getItem("bliss-settings-storage")!).state.theme,
+    ).toBe("light");
   });
 });

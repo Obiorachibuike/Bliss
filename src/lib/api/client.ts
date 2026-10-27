@@ -8,7 +8,7 @@ export interface ApiResult<T> {
 export async function fetchWithTimeout(
   url: string,
   options: RequestInit = {},
-  timeoutMs = 30000
+  timeoutMs = 30000,
 ): Promise<Response> {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), timeoutMs);
@@ -23,7 +23,7 @@ export async function fetchWithTimeout(
 export async function fetchJson<T>(
   url: string,
   options: RequestInit = {},
-  timeoutMs = 30000
+  timeoutMs = 30000,
 ): Promise<ApiResult<T>> {
   try {
     const res = await fetchWithTimeout(url, options, timeoutMs);

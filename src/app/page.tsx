@@ -40,9 +40,15 @@ export default function Home() {
           />
         )}
         {view === "explore" && (
-          <ExploreModels {...common} onUseChat={() => setView("chat")} onUseImage={() => setView("image")} />
+          <ExploreModels
+            {...common}
+            onUseChat={() => setView("chat")}
+            onUseImage={() => setView("image")}
+          />
         )}
-        {view === "image" && <ImageStudio {...common} initialPrompt={imageSeed} />}
+        {view === "image" && (
+          <ImageStudio {...common} initialPrompt={imageSeed} />
+        )}
         {view === "video" && <VideoStudio {...common} />}
         {view === "saved" && <SavedLibrary {...common} />}
         {view === "history" && (

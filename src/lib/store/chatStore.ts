@@ -17,7 +17,11 @@ interface ChatState {
   renameConversation: (id: string, title: string) => void;
   togglePin: (id: string) => void;
   addMessage: (convId: string, msg: ChatMessage) => void;
-  updateMessage: (convId: string, msgId: string, patch: Partial<ChatMessage>) => void;
+  updateMessage: (
+    convId: string,
+    msgId: string,
+    patch: Partial<ChatMessage>,
+  ) => void;
   removeMessage: (convId: string, msgId: string) => void;
   truncateAfter: (convId: string, msgId: string) => void;
   setConversationModel: (convId: string, modelId: ModelId) => void;
@@ -37,7 +41,8 @@ export const useChatStore = create<ChatState>()(
       error: null,
 
       createConversation: (modelId, firstPrompt) => {
-        const id = Math.random().toString(36).slice(2) + Date.now().toString(36);
+        const id =
+          Math.random().toString(36).slice(2) + Date.now().toString(36);
         const conv: Conversation = {
           id,
           title: firstPrompt ? generateTitle(firstPrompt) : "New conversation",
@@ -70,14 +75,14 @@ export const useChatStore = create<ChatState>()(
       renameConversation: (id, title) =>
         set((s) => ({
           conversations: s.conversations.map((c) =>
-            c.id === id ? { ...c, title } : c
+            c.id === id ? { ...c, title } : c,
           ),
         })),
 
       togglePin: (id) =>
         set((s) => ({
           conversations: s.conversations.map((c) =>
-            c.id === id ? { ...c, pinned: !c.pinned } : c
+            c.id === id ? { ...c, pinned: !c.pinned } : c,
           ),
         })),
 
@@ -94,7 +99,7 @@ export const useChatStore = create<ChatState>()(
                       ? generateTitle(msg.content)
                       : c.title,
                 }
-              : c
+              : c,
           ),
         })),
 
@@ -105,17 +110,19 @@ export const useChatStore = create<ChatState>()(
               ? {
                   ...c,
                   messages: c.messages.map((m) =>
-                    m.id === msgId ? { ...m, ...patch } : m
+                    m.id === msgId ? { ...m, ...patch } : m,
                   ),
                 }
-              : c
+              : c,
           ),
         })),
 
       removeMessage: (convId, msgId) =>
         set((s) => ({
           conversations: s.conversations.map((c) =>
-            c.id === convId ? { ...c, messages: c.messages.filter((m) => m.id !== msgId) } : c
+            c.id === convId
+              ? { ...c, messages: c.messages.filter((m) => m.id !== msgId) }
+              : c,
           ),
         })),
 
@@ -124,13 +131,17 @@ export const useChatStore = create<ChatState>()(
           conversations: s.conversations.map((c) => {
             if (c.id !== convId) return c;
             const idx = c.messages.findIndex((m) => m.id === msgId);
-            return idx === -1 ? c : { ...c, messages: c.messages.slice(0, idx + 1) };
+            return idx === -1
+              ? c
+              : { ...c, messages: c.messages.slice(0, idx + 1) };
           }),
         })),
 
       setConversationModel: (convId, modelId) =>
         set((s) => ({
-          conversations: s.conversations.map((c) => (c.id === convId ? { ...c, modelId } : c)),
+          conversations: s.conversations.map((c) =>
+            c.id === convId ? { ...c, modelId } : c,
+          ),
         })),
 
       clearAll: () => set({ conversations: [], activeId: null }),
@@ -147,7 +158,7 @@ export const useChatStore = create<ChatState>()(
         return conversations.filter(
           (c) =>
             c.title.toLowerCase().includes(lower) ||
-            c.messages.some((m) => m.content.toLowerCase().includes(lower))
+            c.messages.some((m) => m.content.toLowerCase().includes(lower)),
         );
       },
     }),
@@ -158,12 +169,15 @@ export const useChatStore = create<ChatState>()(
         conversations: s.conversations,
         activeId: s.activeId,
       }),
-    }
-  )
+    },
+  ),
 );
 
 // helper to construct prompt with history when endpoint lacks context
-export function buildPromptWithHistory(messages: ChatMessage[], newPrompt: string): string {
+export function buildPromptWithHistory(
+  messages: ChatMessage[],
+  newPrompt: string,
+): string {
   // Simple adapter: prepend last 6 messages as context
   if (messages.length === 0) return newPrompt;
   const recent = messages.slice(-6);
@@ -174,5 +188,8 @@ export function buildPromptWithHistory(messages: ChatMessage[], newPrompt: strin
 }
 
 export function uid() {
-  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(2, 6);
+  return (
+    Math.random().toString(36).slice(2, 10) +
+    Date.now().toString(36).slice(2, 6)
+  );
 }

@@ -32,7 +32,8 @@ export const useSettingsStore = create<SettingsState>()(
       ...defaults,
       setTheme: (theme) => set({ theme }),
       setDefaultModel: (defaultModel) => set({ defaultModel }),
-      toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
+      toggleSidebar: () =>
+        set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
       setSidebar: (sidebarCollapsed) => set({ sidebarCollapsed }),
       setEnterToSend: (enterToSend) => set({ enterToSend }),
       setMarkdown: (markdownRendering) => set({ markdownRendering }),
@@ -42,6 +43,6 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: "bliss-settings-storage",
       storage: createJSONStorage(() => localStorage),
-    }
-  )
+    },
+  ),
 );

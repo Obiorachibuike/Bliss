@@ -28,7 +28,7 @@ export function ProviderBadge({
       title={`${detail}${model ? ` Model: ${model}.` : ""}`}
       className={cn(
         "inline-flex items-center gap-1 rounded-full border border-[#22C55E]/25 bg-[#22C55E]/10 px-2 py-0.5 text-[10px] font-medium text-[#16A34A] dark:text-[#4ADE80]",
-        className
+        className,
       )}
     >
       <ShieldCheck className="h-2.5 w-2.5" />

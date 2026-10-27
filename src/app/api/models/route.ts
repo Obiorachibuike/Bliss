@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import {
   MODELS_WITH_FALLBACK,
   IMAGE_MODELS_WITH_FALLBACK,
-  VIDEO_MODELS,
+  VIDEO_MODELS_WITH_FALLBACK,
   API_LIMITATIONS,
   FALLBACK_CAPABILITIES,
 } from "@/lib/api/config";
@@ -20,7 +20,7 @@ export async function GET() {
       success: true,
       text: MODELS_WITH_FALLBACK,
       image: IMAGE_MODELS_WITH_FALLBACK,
-      video: VIDEO_MODELS,
+      video: VIDEO_MODELS_WITH_FALLBACK,
       // These limits belong to the key-less primary provider; the fallback's own
       // limits live under `fallback` so nothing is mis-attributed.
       limitations: API_LIMITATIONS,
@@ -31,13 +31,16 @@ export async function GET() {
         // Only real once the fallback answers: the key-less provider has neither.
         vision: enabled,
         nativeConversationContext: enabled,
-        // Video is intentionally excluded: Bliss only wires up endpoints it has verified.
-        videoModel: null,
+        // Video is wired through the documented async create + poll contract, so the
+        // ids are only advertised when a key can actually answer them.
+        videoModel: enabled ? FALLBACK_CAPABILITIES.videoModel : null,
+        videoModels: enabled ? FALLBACK_CAPABILITIES.videoModels : [],
+        textToVideo: enabled,
       },
       note:
         "Models are a verified static configuration derived from the FreeAiAPIs repository plus the " +
         "documented Agnes AI gateway — neither provider exposes a model-list endpoint Bliss relies on.",
     },
-    { headers: NO_STORE }
+    { headers: NO_STORE },
   );
 }

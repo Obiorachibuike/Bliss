@@ -4,6 +4,7 @@ import {
   API_HOST,
   AGNES_CHAT_MODELS,
   AGNES_IMAGE_MODEL,
+  AGNES_VIDEO_MODEL,
   AGNES_BASE_URL,
   IMAGE_MODELS,
   IMAGE_MODELS_WITH_FALLBACK,
@@ -120,16 +121,18 @@ export async function GET() {
         })(),
         chatModels: enabled ? AGNES_CHAT_MODELS.map((m) => m.id) : [],
         imageModel: enabled ? AGNES_IMAGE_MODEL : null,
+        videoModel: enabled ? AGNES_VIDEO_MODEL : null,
         note: enabled
-          ? "Configured. Used automatically when the primary provider fails after its retries; never probed here to protect your quota."
-          : "Not configured — set AGNES_API_KEY on the server to enable chat, vision and image fallbacks.",
+          ? "Configured. Used automatically when the primary provider fails after its retries, and for Agnes-only models (vision, text-to-video). Never probed here to protect your quota."
+          : "Not configured — set AGNES_API_KEY on the server to enable chat, vision, image and video fallbacks.",
       },
       capabilities: {
         chat: true,
         imageGeneration: true,
         imageEditing: true,
         imageToVideo: true,
-        textToVideo: false,
+        // Key-less WAN 2.2 is image-to-video only; text-to-video arrives with Agnes.
+        textToVideo: enabled,
         vision: enabled,
         streaming: false,
         nativeConversationContext: enabled,

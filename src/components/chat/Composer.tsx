@@ -1,6 +1,14 @@
 "use client";
 import { useRef, useEffect, useState } from "react";
-import { Send, Square, Sparkles, Paperclip, Link2, Info, X } from "lucide-react";
+import {
+  Send,
+  Square,
+  Sparkles,
+  Paperclip,
+  Link2,
+  Info,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ModelSelector } from "./ModelSelector";
@@ -55,7 +63,10 @@ export function Composer({
       toast.error("Enter a valid http(s) image URL");
       return;
     }
-    setText((t) => `${t ? t.replace(/\s+$/, "") + "\n\n" : ""}![reference image](${url})\n`);
+    setText(
+      (t) =>
+        `${t ? t.replace(/\s+$/, "") + "\n\n" : ""}![reference image](${url})\n`,
+    );
     setImageUrl("");
     setAttachOpen(false);
     taRef.current?.focus();
@@ -80,9 +91,15 @@ export function Composer({
             <div className="mb-2 flex items-center justify-between">
               <p className="flex items-center gap-1.5 text-xs font-semibold">
                 <Link2 className="h-3.5 w-3.5 text-[#2563EB]" />
-                {fallback.vision ? "Attach an image for analysis" : "Reference a hosted image"}
+                {fallback.vision
+                  ? "Attach an image for analysis"
+                  : "Reference a hosted image"}
               </p>
-              <button onClick={() => setAttachOpen(false)} aria-label="Close attachment panel" className="rounded-md p-1 hover:bg-slate-100 dark:hover:bg-white/10">
+              <button
+                onClick={() => setAttachOpen(false)}
+                aria-label="Close attachment panel"
+                className="rounded-md p-1 hover:bg-slate-100 dark:hover:bg-white/10"
+              >
                 <X className="h-3.5 w-3.5" />
               </button>
             </div>
@@ -94,7 +111,9 @@ export function Composer({
                 onKeyDown={(e) => e.key === "Enter" && attach()}
                 placeholder="https://example.com/photo.jpg"
               />
-              <Button size="sm" onClick={attach} className="shrink-0">Add</Button>
+              <Button size="sm" onClick={attach} className="shrink-0">
+                Add
+              </Button>
             </div>
             <p className="mt-2 flex items-start gap-1.5 text-[11px] leading-relaxed text-[#94A3B8]">
               <Info className="mt-0.5 h-3 w-3 shrink-0" />
@@ -113,7 +132,9 @@ export function Composer({
               : "border-[rgba(148,163,184,0.16)] focus-within:ring-[#2563EB]/10")
           }
         >
-          <label className="sr-only" htmlFor="bliss-composer">Message Bliss</label>
+          <label className="sr-only" htmlFor="bliss-composer">
+            Message Bliss
+          </label>
           <textarea
             id="bliss-composer"
             ref={taRef}
@@ -148,15 +169,30 @@ export function Composer({
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
-              <span className={"hidden text-[11px] tabular-nums sm:inline " + (text.length > maxLen ? "text-[#EF4444]" : "text-[#94A3B8]")}>
+              <span
+                className={
+                  "hidden text-[11px] tabular-nums sm:inline " +
+                  (text.length > maxLen ? "text-[#EF4444]" : "text-[#94A3B8]")
+                }
+              >
                 {text.length}/{maxLen}
               </span>
               {isStreaming ? (
-                <Button variant="outline" size="sm" onClick={onStop} className="gap-1.5 rounded-xl">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onStop}
+                  className="gap-1.5 rounded-xl"
+                >
                   <Square className="h-3.5 w-3.5 fill-current" /> Stop
                 </Button>
               ) : (
-                <Button onClick={send} disabled={!text.trim() || disabled} className="rounded-xl px-4" aria-label="Send message">
+                <Button
+                  onClick={send}
+                  disabled={!text.trim() || disabled}
+                  className="rounded-xl px-4"
+                  aria-label="Send message"
+                >
                   <Send className="h-4 w-4" />
                   <span className="hidden sm:inline">Send</span>
                 </Button>
@@ -178,7 +214,8 @@ export function Composer({
           </span>
           <span className="flex items-center gap-1">
             <Sparkles className="h-3 w-3 text-[#2563EB]" />
-            Requests run through Bliss server routes with retries and rate limits
+            Requests run through Bliss server routes with retries and rate
+            limits
           </span>
         </p>
       </div>
