@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { Copy, Check, RefreshCw, Pencil, Bookmark, User, Sparkles, AlertTriangle } from "lucide-react";
+import { ProviderBadge } from "./ProviderBadge";
 import type { ChatMessage } from "@/lib/types";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { BlissMark } from "./BlissMark";
@@ -133,6 +134,7 @@ export function MessageList({
                         {m.modelId}
                       </span>
                     )}
+                    {!isUser && m.via === "agnes" && <ProviderBadge provider="agnes" model={m.modelId} />}
                   </div>
 
                   {isUser ? (

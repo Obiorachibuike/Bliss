@@ -8,7 +8,7 @@ import { MessageList } from "./MessageList";
 import { WelcomeScreen } from "./WelcomeScreen";
 import { ContextPanel } from "./ContextPanel";
 import type { ChatMessage, ModelId } from "@/lib/types";
-import { MODELS } from "@/lib/api/config";
+import { useFallbackStatus, useTextModels } from "@/lib/hooks/useModelCatalog";
 import { toast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils/cn";
 
@@ -27,6 +27,8 @@ export function ChatWorkspace({
   const truncateAfter = useChatStore((s) => s.truncateAfter);
   const setConversationModel = useChatStore((s) => s.setConversationModel);
 
+  const catalog = useTextModels();
+  const fallback = useFallbackStatus();
   const defaultModel = useSettingsStore((s) => s.defaultModel);
   const setDefaultModel = useSettingsStore((s) => s.setDefaultModel);
   const showPanel = useSettingsStore((s) => s.showContextPanel);
@@ -76,7 +78,13 @@ export function ChatWorkspace({
           return;
         }
 
-        updateMessage(convId, asstId, { content: data.response.trim(), modelId: data.model ?? modelId });
+        // The message records the model that actually answered, while the
+        // conversation keeps the model the user chose for the next turn.
+        updateMessage(convId, asstId, {
+          content: data.response.trim(),
+          modelId: data.answeredBy ?? data.model ?? modelId,
+          via: data.provider === "agnes" ? "agnes" : "cvron",
+        });
       } catch (e: unknown) {
         if (e instanceof DOMException && e.name === "AbortError") {
           removeMessage(convId, asstId);
@@ -141,7 +149,7 @@ export function ChatWorkspace({
   );
 
   const stop = () => abortRef.current?.abort();
-  const modelName = MODELS.find((m) => m.id === model)?.name ?? model;
+  const modelName = catalog.find((m) => m.id === model)?.name ?? model;
 
   return (
     <div className="relative flex min-w-0 flex-1">
@@ -187,7 +195,10 @@ export function ChatWorkspace({
           <div className="flex items-center gap-2 border-b border-[#F59E0B]/20 bg-[#F59E0B]/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-300">
             <WifiOff className="h-3.5 w-3.5 shrink-0" />
             <span className="flex-1">
-              The upstream AI service didn&rsquo;t answer after automatic retries. Switch model or try again in a moment.
+              The key-less upstream didn&rsquo;t answer after its retries
+              {fallback.enabled
+                ? ", and the Agnes fallback couldn't take over either. Switch model or try again in a moment."
+                : ". Set AGNES_API_KEY to enable the Agnes fallback, or switch model and retry."}
             </span>
             {active && (
               <button

@@ -1,7 +1,8 @@
 "use client";
 import { useMemo, useState } from "react";
-import { Search, Check, Sparkles, Image as ImageIcon, Film, Menu, EyeOff, ArrowRight } from "lucide-react";
-import { MODELS, IMAGE_MODELS, VIDEO_MODELS, ENDPOINTS, API_LIMITATIONS } from "@/lib/api/config";
+import { Search, Check, Sparkles, Image as ImageIcon, Film, Menu, EyeOff, ArrowRight, ShieldCheck } from "lucide-react";
+import { MODELS_WITH_FALLBACK, IMAGE_MODELS_WITH_FALLBACK, VIDEO_MODELS, ENDPOINTS, API_LIMITATIONS } from "@/lib/api/config";
+import { useFallbackStatus } from "@/lib/hooks/useModelCatalog";
 import { useSettingsStore } from "@/lib/store/settingsStore";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ const GROUPS = [
   { id: "coding", label: "Coding" },
   { id: "image", label: "Image generation" },
   { id: "vision", label: "Vision" },
+  { id: "fallback", label: "Fallback provider" },
 ];
 
 export function ExploreModels({
@@ -28,12 +30,13 @@ export function ExploreModels({
 }) {
   const [q, setQ] = useState("");
   const [group, setGroup] = useState<string>("all");
+  const fallback = useFallbackStatus();
   const setDefaultModel = useSettingsStore((s) => s.setDefaultModel);
   const defaultModel = useSettingsStore((s) => s.defaultModel);
 
   const cards = useMemo(() => {
     const all = [
-      ...MODELS.map((m) => ({
+      ...MODELS_WITH_FALLBACK.map((m) => ({
         id: m.id,
         name: m.name,
         provider: m.provider,
@@ -42,12 +45,22 @@ export function ExploreModels({
         endpoint: m.endpoint,
         kind: "text" as const,
         icon: m.icon,
-        available: true,
-        groups: m.capabilities.map((c: string) =>
-          c.toLowerCase().includes("code") ? "coding" : c.toLowerCase().includes("reason") ? "reasoning" : "general"
-        ) as string[],
+        available: m.available,
+        fallback: !!m.fallback,
+        groups: [
+          ...m.capabilities.map((c: string) =>
+            c.toLowerCase().includes("code")
+              ? "coding"
+              : c.toLowerCase().includes("vision")
+              ? "vision"
+              : c.toLowerCase().includes("reason")
+              ? "reasoning"
+              : "general"
+          ),
+          ...(m.fallback ? ["fallback"] : []),
+        ] as string[],
       })),
-      ...IMAGE_MODELS.map((m) => ({
+      ...IMAGE_MODELS_WITH_FALLBACK.map((m) => ({
         id: m.id,
         name: m.name,
         provider: m.provider,
@@ -57,7 +70,8 @@ export function ExploreModels({
         kind: "image" as const,
         icon: "🎨",
         available: m.available,
-        groups: ["image"],
+        fallback: !!m.fallback,
+        groups: ["image", ...(m.fallback ? ["fallback"] : [])] as string[],
       })),
       ...VIDEO_MODELS.map((m) => ({
         id: m.id,
@@ -69,6 +83,7 @@ export function ExploreModels({
         kind: "video" as const,
         icon: "🎬",
         available: m.available,
+        fallback: false,
         groups: ["image"],
       })),
     ];
@@ -93,7 +108,9 @@ export function ExploreModels({
           <h1 className="flex items-center gap-2 text-sm font-semibold">
             <Sparkles className="h-4 w-4 text-[#2563EB]" /> Explore Models
           </h1>
-          <p className="hidden text-[11px] text-[#94A3B8] sm:block">Verified against the FreeAiAPIs repository</p>
+          <p className="hidden text-[11px] text-[#94A3B8] sm:block">
+            Verified against FreeAiAPIs{fallback.enabled ? " + the Agnes AI fallback" : " (fallback provider not configured)"}
+          </p>
         </div>
       </header>
 
@@ -112,7 +129,16 @@ export function ExploreModels({
           <div className="flex flex-wrap gap-1.5">
             <Chip active={group === "all"} onClick={() => setGroup("all")}>All</Chip>
             {GROUPS.map((g) => (
-              <Chip key={g.id} active={group === g.id} onClick={() => setGroup(g.id)} disabled={g.id === "vision"}>
+              <Chip
+                key={g.id}
+                active={group === g.id}
+                onClick={() => setGroup(g.id)}
+                title={
+                  g.id === "vision" && !fallback.vision
+                    ? "Vision needs the Agnes fallback provider"
+                    : undefined
+                }
+              >
                 {g.label}
               </Chip>
             ))}
@@ -136,7 +162,14 @@ export function ExploreModels({
                       </div>
                       <p className="text-xs text-[#94A3B8]">{m.provider}</p>
                     </div>
-                    <Badge className="shrink-0">{m.kind}</Badge>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <Badge className="shrink-0">{m.kind}</Badge>
+                      {m.fallback && (
+                        <span className={cn("flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium", "border border-[#2563EB]/25 bg-[#EFF6FF] text-[#2563EB] dark:bg-[#2563EB]/15 dark:text-[#60A5FA]")}>
+                          <ShieldCheck className="h-2.5 w-2.5" /> fallback
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <p className="line-clamp-2 text-xs leading-relaxed text-[#94A3B8]">{m.description}</p>
@@ -148,6 +181,13 @@ export function ExploreModels({
                   </div>
 
                   <code className="block truncate rounded-lg bg-slate-50 px-2 py-1.5 font-mono text-[10px] text-[#94A3B8] dark:bg-white/5">{m.endpoint.replace("https://", "")}</code>
+
+                  {m.fallback && !fallback.enabled && (
+                    <p className="rounded-lg border border-[#F59E0B]/25 bg-[#F59E0B]/10 px-2 py-1.5 text-[10px] leading-relaxed text-amber-700 dark:text-amber-300">
+                      Selecting this model returns a clear &ldquo;not enabled&rdquo; error until a server-side
+                      AGNES_API_KEY is configured — Bliss never reroutes it to the key-less provider.
+                    </p>
+                  )}
 
                   <div className="flex items-center gap-2 pt-1">
                     {m.kind === "text" && (
@@ -185,9 +225,9 @@ export function ExploreModels({
               <div className="flex-1">
                 <p className="text-sm font-semibold">Not supported by this provider</p>
                 <p className="mt-0.5 text-xs leading-relaxed text-[#94A3B8]">
-                  Vision / image analysis, text-to-video, function calling and streaming are not documented at
-                  the CVRON free API, so Bliss doesn&rsquo;t fake them. Native conversation context is also unavailable —
-                  Bliss builds a compact prompt digest from your last {6} messages instead.
+                  {fallback.vision
+                    ? "Vision analysis, native multi-turn context and image editing run through the Agnes fallback. Text-to-video, function calling and streaming stay off: Bliss only wires up what each provider actually documents."
+                    : "Vision / image analysis, text-to-video, function calling and streaming are not documented at the CVRON free API, so Bliss doesn’t fake them. Native conversation context is unavailable too — Bliss builds a compact prompt digest from your last 6 messages. Set AGNES_API_KEY to lift the vision and multi-turn limits."}
                 </p>
               </div>
               <code className="rounded-lg bg-white px-2 py-1 font-mono text-[10px] text-[#94A3B8] dark:bg-[#101827]">
@@ -201,7 +241,7 @@ export function ExploreModels({
   );
 }
 
-function Chip({ children, active, onClick, disabled }: { children: React.ReactNode; active?: boolean; onClick?: () => void; disabled?: boolean }) {
+function Chip({ children, active, onClick, disabled, title }: { children: React.ReactNode; active?: boolean; onClick?: () => void; disabled?: boolean; title?: string }) {
   return (
     <button
       onClick={onClick}
@@ -211,7 +251,7 @@ function Chip({ children, active, onClick, disabled }: { children: React.ReactNo
         disabled && "cursor-not-allowed opacity-40",
         active ? "border-transparent brand-gradient text-white shadow-sm" : "hover:bg-slate-50 dark:hover:bg-white/5"
       )}
-      title={disabled ? "No verified vision endpoint exists" : undefined}
+      title={title ?? (disabled ? "No verified vision endpoint exists" : undefined)}
     >
       {children}
     </button>

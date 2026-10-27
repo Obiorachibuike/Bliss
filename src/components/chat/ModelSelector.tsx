@@ -1,9 +1,9 @@
 "use client";
 import { useState } from "react";
-import { MODELS } from "@/lib/api/config";
 import { cn } from "@/lib/utils/cn";
-import { Search, Check, ChevronDown, Zap, Brain, Code2 } from "lucide-react";
+import { Search, Check, ChevronDown, Zap, Brain, Code2, Eye, ShieldCheck } from "lucide-react";
 import type { ModelId } from "@/lib/types";
+import { useFallbackStatus, useTextModels } from "@/lib/hooks/useModelCatalog";
 
 export function ModelSelector({
   value,
@@ -14,6 +14,8 @@ export function ModelSelector({
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  const MODELS = useTextModels();
+  const fallback = useFallbackStatus();
   const selected = MODELS.find((m) => m.id === value) || MODELS[0];
   const filtered = MODELS.filter(
     (m) =>
@@ -24,6 +26,7 @@ export function ModelSelector({
   const capIcon = (cap: string) => {
     if (cap.toLowerCase().includes("code")) return <Code2 className="w-3 h-3" />;
     if (cap.toLowerCase().includes("reason")) return <Brain className="w-3 h-3" />;
+    if (cap.toLowerCase().includes("vision")) return <Eye className="w-3 h-3" />;
     return <Zap className="w-3 h-3" />;
   };
 
@@ -54,7 +57,9 @@ export function ModelSelector({
                   className="w-full h-9 pl-9 pr-3 rounded-xl border border-[rgba(148,163,184,0.16)] bg-slate-50 dark:bg-[#0B1220] text-sm outline-none focus:ring-2 focus:ring-[#2563EB]/20"
                 />
               </div>
-              <p className="text-xs text-[#94A3B8] mt-2">4 verified models • All free • No API key</p>
+              <p className="text-xs text-[#94A3B8] mt-2">
+                {MODELS.length} verified models • {fallback.enabled ? "fallback provider active" : "no API key needed"}
+              </p>
             </div>
 
             <div className="p-2 max-h-[360px] overflow-auto space-y-1">
@@ -79,6 +84,11 @@ export function ModelSelector({
                       <span className={cn("text-xs px-1.5 py-0.5 rounded-full font-medium", value === m.id ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-white/10 text-slate-500")}>
                         {m.provider}
                       </span>
+                      {m.fallback && (
+                        <span className={cn("flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium", value === m.id ? "bg-white/20 text-white" : "bg-[#22C55E]/10 text-[#16A34A] dark:text-[#4ADE80]")}>
+                          <ShieldCheck className="h-2.5 w-2.5" /> fallback
+                        </span>
+                      )}
                       {value === m.id && <Check className="w-4 h-4 ml-auto" />}
                     </div>
                     <p className={cn("text-xs mt-0.5 line-clamp-1", value === m.id ? "text-white/80" : "text-[#94A3B8]")}>{m.description}</p>
@@ -96,7 +106,11 @@ export function ModelSelector({
             </div>
 
             <div className="p-3 bg-slate-50 dark:bg-white/5 border-t border-[rgba(148,163,184,0.12)]">
-              <p className="text-xs text-[#94A3B8]">Bliss adapts your history into a single prompt because upstreams accept only one prompt (no native context).</p>
+              <p className="text-xs text-[#94A3B8]">
+                {fallback.enabled
+                  ? "If a key-less model fails after its retries, Bliss automatically falls back to Agnes AI with your real conversation turns. Pick an Agnes model to always use it."
+                  : "Bliss adapts your history into a single prompt because the key-less upstreams accept only one prompt. Set AGNES_API_KEY to unlock the Agnes fallback and native multi-turn context."}
+              </p>
             </div>
           </div>
         </>

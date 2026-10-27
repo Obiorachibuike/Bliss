@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Settings as SettingsIcon, Sun, Moon, Monitor, Trash2, Database, Shield, Info, Menu, Check } from "lucide-react";
+import { Settings as SettingsIcon, Sun, Moon, Monitor, Trash2, Database, Shield, ShieldCheck, Info, Menu, Check, ExternalLink, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,7 +8,8 @@ import { useSettingsStore } from "@/lib/store/settingsStore";
 import { useTheme } from "@/components/layout/ThemeProvider";
 import { useChatStore } from "@/lib/store/chatStore";
 import { useSavedStore } from "@/lib/store/savedStore";
-import { MODELS, IMAGE_MODELS, VIDEO_MODELS } from "@/lib/api/config";
+import { VIDEO_MODELS } from "@/lib/api/config";
+import { refreshCatalog, useFallbackStatus, useImageModels, useTextModels } from "@/lib/hooks/useModelCatalog";
 import { toast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils/cn";
 import type { Theme } from "@/lib/types";
@@ -41,6 +42,9 @@ function Row({ title, desc, children }: { title: string; desc: string; children:
 
 export function SettingsView({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
   const s = useSettingsStore();
+  const MODELS = useTextModels();
+  const imageModels = useImageModels();
+  const fallback = useFallbackStatus();
   const { theme, setTheme } = useTheme();
   const [status, setStatus] = useState<{ status: string; services?: Record<string, { reachable: boolean; latency: number }>; capabilities?: Record<string, boolean> } | null>(null);
 
@@ -113,8 +117,16 @@ export function SettingsView({ onOpenMobileNav }: { onOpenMobileNav: () => void 
 
           {/* Generation */}
           <Section title="Generation" desc="Defaults used by the creative studios.">
-            <Row title="Default image model" desc="Flux Dev is the only documented text-to-image endpoint.">
-              <Badge className="gap-1"><Check className="h-3 w-3 text-[#22C55E]" /> {IMAGE_MODELS[0].name}</Badge>
+            <Row title="Default image model" desc="Flux Dev (key-less) is tried first; the Agnes model is used as its fallback or when picked explicitly.">
+              <div className="flex flex-wrap justify-end gap-1.5">
+                {imageModels.map((m) => (
+                  <Badge key={m.id} className={cn("gap-1", m.fallback && !fallback.enabled && "opacity-60")}>
+                    {m.fallback ? <ShieldCheck className="h-3 w-3 text-[#2563EB]" /> : <Check className="h-3 w-3 text-[#22C55E]" />}
+                    {m.name}
+                    {m.fallback && !fallback.enabled ? " · needs key" : ""}
+                  </Badge>
+                ))}
+              </div>
             </Row>
             <Row title="Default video model" desc="WAN 2.2 accepts an image plus a motion prompt. Text-to-video is not offered.">
               <Badge className="gap-1"><Check className="h-3 w-3 text-[#22C55E]" /> {VIDEO_MODELS[0].name}</Badge>
@@ -158,6 +170,36 @@ export function SettingsView({ onOpenMobileNav }: { onOpenMobileNav: () => void 
                   {k.replace(/([A-Z])/g, " $1").toLowerCase()}
                 </Badge>
               ))}
+            </div>
+            <div className="mt-3 rounded-xl border border-[rgba(148,163,184,0.16)] p-3">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className={cn("h-4 w-4", fallback.enabled ? "text-[#22C55E]" : "text-[#94A3B8]")} />
+                <p className="flex-1 text-xs font-semibold">Fallback provider · {fallback.provider}</p>
+                <Badge className={cn(fallback.enabled ? "border-[#22C55E]/25 bg-[#22C55E]/10 text-[#16A34A]" : "text-[#94A3B8]")}>
+                  {fallback.enabled ? "enabled" : "not configured"}
+                </Badge>
+              </div>
+              <p className="mt-2 text-[11px] leading-relaxed text-[#94A3B8]">
+                {fallback.enabled ? (
+                  <>Chat, image generation and editing fall back to <span className="font-mono">{fallback.chatModels.join(", ")}</span> when
+                  the key-less upstream fails after its retries. Vision analysis and native multi-turn context are on. Bliss never probes
+                  this provider from the health route so your quota stays untouched.</>
+                ) : (
+                  <>Bliss works with zero secrets. Adding a server-side <code className="rounded bg-slate-100 px-1 dark:bg-white/10">AGNES_API_KEY</code>{" "}
+                  (from <a href={fallback.docs} target="_blank" rel="noopener noreferrer" className="font-medium text-[#2563EB] underline underline-offset-2">the Agnes docs</a>) turns on
+                  automatic fallback, image analysis and true multi-turn context. Nothing is faked while it is off.</>
+                )}
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {!fallback.enabled && (
+                  <a href="https://platform.agnes-ai.com" target="_blank" rel="noopener noreferrer">
+                    <Button size="sm" variant="outline" className="gap-1.5">Get a key <ExternalLink className="h-3 w-3" /></Button>
+                  </a>
+                )}
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => { refreshCatalog(); toast.info("Re-checked the model catalogue"); }}>
+                  <RefreshCw className="h-3 w-3" /> Re-check
+                </Button>
+              </div>
             </div>
             <p className="mt-3 text-[11px] leading-relaxed text-[#94A3B8]">
               {status?.status === "operational"

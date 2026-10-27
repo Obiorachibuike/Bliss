@@ -153,7 +153,13 @@ describe("POST /api/image", () => {
     );
     const res = await imagePOST(req({ prompt: "a blue planet" }, {}) as never);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true, imageUrl: "https://cdn.test/img-1.jpg" });
+    expect(await res.json()).toEqual({
+      success: true,
+      imageUrl: "https://cdn.test/img-1.jpg",
+      model: "flux-dev",
+      provider: "cvron",
+      fallbackUsed: false,
+    });
   });
 
   it("surfaces a generation failure instead of a placeholder image", async () => {
@@ -218,7 +224,13 @@ describe("POST /api/video", () => {
       req({ prompt: "drifting clouds", imageUrl: "https://host/sky.jpg" }) as never
     );
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true, videoUrl: "https://cdn.test/clip.mp4" });
+    expect(await res.json()).toEqual({
+      success: true,
+      videoUrl: "https://cdn.test/clip.mp4",
+      model: "wan-2.2",
+      provider: "cvron",
+      fallbackUsed: false,
+    });
     const u = new URL(seen);
     expect(u.pathname).toBe("/cvronai/wan22.php");
     expect(u.searchParams.get("image")).toBe("https://host/sky.jpg");

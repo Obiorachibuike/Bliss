@@ -1,11 +1,11 @@
 "use client";
 import { useState } from "react";
-import { History as HistoryIcon, Search, Trash2, MessageSquare, Pin, ChevronRight, Menu } from "lucide-react";
+import { History as HistoryIcon, Search, Trash2, MessageSquare, Pin, ChevronRight, Menu, ShieldCheck } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useChatStore } from "@/lib/store/chatStore";
 import { relativeTime } from "@/lib/utils/title";
-import { MODELS } from "@/lib/api/config";
+import { MODELS_WITH_FALLBACK } from "@/lib/api/config";
 import { toast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils/cn";
 
@@ -97,7 +97,7 @@ export function HistoryView({
           ) : (
             <div className="space-y-2">
               {list.map((c) => {
-                const model = MODELS.find((m) => m.id === c.modelId);
+                const model = MODELS_WITH_FALLBACK.find((m) => m.id === c.modelId);
                 const last = c.messages[c.messages.length - 1];
                 return (
                   <Card key={c.id} className="group animate-fade-up cursor-pointer transition-all hover:-translate-y-0.5 hover:border-[#2563EB]/25 hover:shadow-[0_14px_36px_-20px_rgba(37,99,235,0.5)]">
@@ -116,7 +116,14 @@ export function HistoryView({
                       </div>
                       <div className="hidden shrink-0 text-right sm:block">
                         <p className="text-[11px] font-medium">{relativeTime(c.updatedAt)}</p>
-                        <p className="text-[10px] text-[#94A3B8]">{c.messages.length} msgs · {model?.name ?? c.modelId}</p>
+                        <p className="flex items-center justify-end gap-1 text-[10px] text-[#94A3B8]">
+                          {c.messages.length} msgs · {model?.name ?? c.modelId}
+                          {c.messages.some((m) => m.via === "agnes") && (
+                            <span className="inline-flex items-center gap-0.5 rounded-full border border-[#22C55E]/25 bg-[#22C55E]/10 px-1.5 text-[9px] font-medium text-[#16A34A] dark:text-[#4ADE80]">
+                              <ShieldCheck className="h-2 w-2" /> Agnes reply
+                            </span>
+                          )}
+                        </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-0.5">
                         <button onClick={(e) => { e.stopPropagation(); togglePin(c.id); }} className="grid h-7 w-7 place-items-center rounded-lg opacity-0 transition hover:bg-slate-100 group-hover:opacity-100 dark:hover:bg-white/10" aria-label="Pin">

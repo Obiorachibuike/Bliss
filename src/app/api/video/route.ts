@@ -33,13 +33,16 @@ export async function POST(req: Request) {
 
   try {
     const { videoUrl } = await generateVideo(prompt, imageUrl);
-    return NextResponse.json({ success: true, videoUrl });
+    // No fallback here: Agnes video models are documented with request/polling shapes
+    // Bliss hasn't verified, so a failure stays a failure instead of a guess.
+    return NextResponse.json({ success: true, videoUrl, model: "wan-2.2", provider: "cvron", fallbackUsed: false });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "Video generation failed.";
     return NextResponse.json(
       {
         success: false,
-        error: "Video generation failed or timed out. Long jobs can take several minutes — please try again.",
+        error: "Video generation failed or timed out. Long jobs can take several minutes — please try again. The video endpoint has no fallback provider.",
+        fallbackUsed: false,
         detail: process.env.NODE_ENV === "development" ? message : undefined,
       },
       { status: 502 }
