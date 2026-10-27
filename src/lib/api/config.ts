@@ -212,17 +212,6 @@ export const AGNES_CHAT_MODELS = [
     icon: "⚡",
   },
   {
-    id: "agnes-2.5-pro-beta",
-    name: "Agnes 2.5 Pro Beta",
-    description:
-      "Advanced reasoning and long-context analysis. Billed per token — costs real credits.",
-    capabilities: ["Reasoning", "Coding", "Vision"],
-    vision: true,
-    billed: true,
-    color: "#6366F1",
-    icon: "🧠",
-  },
-  {
     id: "agnes-2.5-pro",
     name: "Agnes 2.5 Pro",
     description:
@@ -232,6 +221,17 @@ export const AGNES_CHAT_MODELS = [
     billed: true,
     color: "#7C3AED",
     icon: "💎",
+  },
+  {
+    id: "agnes-2.5-pro-beta",
+    name: "Agnes 2.5 Pro Beta",
+    description:
+      "Advanced reasoning and long-context analysis. Billed per token — costs real credits.",
+    capabilities: ["Reasoning", "Coding", "Vision"],
+    vision: true,
+    billed: true,
+    color: "#6366F1",
+    icon: "🧠",
   },
 ] as const satisfies readonly AgnesChatModelSpec[];
 
@@ -383,7 +383,19 @@ export function agnesVideoModel(
   return AGNES_VIDEO_MODELS.find((m) => m.id === model);
 }
 
-export const AGNES_VIDEO_MODEL = AGNES_VIDEO_MODELS[0].id;
+/** Pure form of the rule below, exported so the validation is testable. */
+export function readAgnesVideoModel(value: string | undefined): string {
+  const candidate = (value ?? "").trim();
+  return (AGNES_VIDEO_IDS as readonly string[]).includes(candidate)
+    ? candidate
+    : AGNES_VIDEO_MODELS[0].id;
+}
+
+/** Default model for an automatic video task. `AGNES_VIDEO_MODEL` selects any documented
+ *  id; an unknown value is ignored rather than sent upstream. */
+export const AGNES_VIDEO_MODEL: string = readAgnesVideoModel(
+  process.env.AGNES_VIDEO_MODEL,
+);
 
 /** Docs: "Poll every 1–2 seconds until status becomes completed or failed" and to use
  *  backoff for 429s. Bliss polls at 2s and gives up after the documented worst case. */

@@ -22,6 +22,7 @@ import {
   ImagePlus,
   Ban,
   Sparkles,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -97,8 +98,9 @@ export function VideoStudio({
   );
   const [imageUrl, setImageUrl] = useState(prefillImageUrl ?? "");
 
-  // Agnes-only controls, driven by the documented per-model spec.
-  const [mode, setMode] = useState<Mode>("keyframe");
+  /* Agnes-only controls, driven by the documented per-model spec. "text" is the
+   * provider's own default, so an untouched form sends a plain text-to-video task. */
+  const [mode, setMode] = useState<Mode>("text");
   const [seconds, setSeconds] = useState<number>(AGNES_VIDEO_SECONDS.default);
   const [size, setSize] = useState<string>("720P");
   const [ratio, setRatio] = useState<string>("16:9");
@@ -112,6 +114,10 @@ export function VideoStudio({
   const [elapsed, setElapsed] = useState(0);
   const [progress, setProgress] = useState(0);
   const [jobId, setJobId] = useState<string | null>(null);
+  /* The status endpoint needs the model the task was created with, and a resumed
+   * watch must keep using it even if the picker moved on meanwhile. */
+  const [jobModel, setJobModel] = useState<string | null>(null);
+  const pollInterval = useRef<number>(AGNES_VIDEO_POLL.intervalMs);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
@@ -157,7 +163,6 @@ export function VideoStudio({
       );
       return;
     }
-    const timer = setInterval(() => setElapsed((e) => e + 1), 1000);
     try {
       const res = await fetch("/api/video", {
         method: "POST",
@@ -190,12 +195,56 @@ export function VideoStudio({
             : "Video generation failed.";
       setError(msg);
       toast.error(msg);
-    } finally {
-      clearInterval(timer);
     }
   };
 
-  /* ── Agnes: create the task, then poll from the browser ────────────────── */
+  /* Polling lives in the browser on purpose: a video can take minutes, and no
+   * serverless timeout should be the reason a paid task is lost. The loop is shared
+   * by "Generate" and "Keep watching", so a stopped task can be resumed. */
+  const watchTask = async (id: string, modelOfJob: string) => {
+    const startedAt = Date.now();
+    let wait = pollInterval.current;
+    watching.current = true;
+    while (watching.current) {
+      if (Date.now() - startedAt > AGNES_VIDEO_POLL.maxWaitMs) {
+        throw new Error(
+          `Still rendering after ${Math.round(AGNES_VIDEO_POLL.maxWaitMs / 60_000)} minutes. Task ${id} is untouched — press "Keep watching" to carry on.`,
+        );
+      }
+      await sleep(wait);
+      if (!watching.current) return;
+      const res = await fetch(
+        `/api/video?jobId=${encodeURIComponent(id)}&model=${encodeURIComponent(modelOfJob)}`,
+        { cache: "no-store" },
+      );
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        // A 429/5xx from the status endpoint is not a failed render: back off, keep the task.
+        wait = Math.min(wait * 2, AGNES_VIDEO_POLL.maxWaitMs / 20);
+        setError(
+          data?.error ??
+            "Couldn't read the task status — backing off and retrying.",
+        );
+        continue;
+      }
+      setError(null);
+      setProgress(typeof data.progress === "number" ? data.progress : 0);
+      if (data.status === "completed" && typeof data.videoUrl === "string") {
+        setProgress(100);
+        setVideoUrl(data.videoUrl);
+        save(data.videoUrl, firstFrame.trim() || toList(imagesText)[0] || "");
+        setProviderNote(
+          `Task ${id} finished on ${spec?.name ?? "Agnes"}. Provider URLs are temporary — download anything you want to keep.`,
+        );
+        toast.success("Video ready");
+        return;
+      }
+      if (data.status === "failed") {
+        throw new Error(data.error ?? "The video task failed upstream.");
+      }
+    }
+  };
+
   const runAgnes = async () => {
     const images = toList(imagesText);
     const audios = toList(audiosText);
@@ -218,11 +267,6 @@ export function VideoStudio({
         : {}),
     };
 
-    const started = Date.now();
-    const maxWaitMs = AGNES_VIDEO_POLL.maxWaitMs;
-    let intervalMs = 2_000;
-    watching.current = true;
-
     const createRes = await fetch("/api/video", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -239,53 +283,37 @@ export function VideoStudio({
       );
     }
 
-    setJobId(created.jobId);
-    intervalMs =
-      typeof created.pollIntervalMs === "number"
+    const modelOfJob =
+      typeof created.model === "string" ? created.model : model;
+    pollInterval.current =
+      typeof created.pollIntervalMs === "number" && created.pollIntervalMs > 0
         ? created.pollIntervalMs
-        : intervalMs;
+        : AGNES_VIDEO_POLL.intervalMs;
+    setJobId(created.jobId);
+    setJobModel(modelOfJob);
+    setProgress(typeof created.progress === "number" ? created.progress : 0);
     setProviderNote(
-      `Task ${created.jobId} queued on ${spec?.name ?? "Agnes"}. The browser checks its status every ${Math.round(
-        intervalMs / 1000,
-      )}s — closing this tab stops watching, not the render.`,
+      `Task ${created.jobId} queued on ${spec?.name ?? "Agnes"}. The browser checks its status every ${Math.round(pollInterval.current / 1000)}s — closing this tab stops watching, not the render.`,
     );
+    await watchTask(created.jobId, modelOfJob);
+  };
 
-    while (watching.current) {
-      if (Date.now() - started > maxWaitMs) {
-        throw new Error(
-          `Still rendering after ${Math.round(maxWaitMs / 60_000)} minutes. The task id is ${created.jobId} — reload this tab later to check it again.`,
-        );
-      }
-      await sleep(intervalMs);
-      if (!watching.current) return;
-      const res = await fetch(
-        `/api/video?jobId=${encodeURIComponent(created.jobId)}&model=${encodeURIComponent(model)}`,
-        {
-          cache: "no-store",
-        },
-      );
-      const data = await res.json().catch(() => null);
-      if (!res.ok || !data?.success) {
-        // 429/5xx from the status endpoint: back off, keep the task.
-        intervalMs = Math.min(intervalMs * 2, 15_000);
-        setError(
-          data?.error ??
-            "Couldn't read the task status — backing off and retrying.",
-        );
-        continue;
-      }
-      setError(null);
-      setProgress(typeof data.progress === "number" ? data.progress : 0);
-      if (data.status === "completed" && typeof data.videoUrl === "string") {
-        setProgress(100);
-        setVideoUrl(data.videoUrl);
-        save(data.videoUrl, firstFrame.trim() || images[0] || "");
-        toast.success("Video ready");
-        return;
-      }
-      if (data.status === "failed") {
-        throw new Error(data.error ?? "The video task failed upstream.");
-      }
+  /** Resume watching a task this tab already started (or restart after a reload). */
+  const resumeWatching = async () => {
+    if (!jobId) return;
+    setError(null);
+    setBusy(true);
+    const timer = setInterval(() => setElapsed((e) => e + 1), 1000);
+    try {
+      await watchTask(jobId, jobModel ?? model);
+    } catch (e: unknown) {
+      const msg =
+        e instanceof Error ? e.message : "Couldn't read the task status.";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      clearInterval(timer);
+      setBusy(false);
     }
   };
 
@@ -294,6 +322,7 @@ export function VideoStudio({
     setVideoUrl(null);
     setProviderNote(null);
     setJobId(null);
+    setJobModel(null);
     setProgress(0);
     setElapsed(0);
     if (!prompt.trim()) {
@@ -331,7 +360,7 @@ export function VideoStudio({
     setBusy(false);
     setProviderNote(
       jobId
-        ? `Stopped watching task ${jobId}. It keeps rendering upstream — reload this tab and press Generate again, or check /api/video?jobId=${jobId}.`
+        ? `Stopped watching task ${jobId}. It keeps rendering upstream — press "Keep watching" to check again, or call /api/video?jobId=${jobId}.`
         : "Stopped watching.",
     );
     toast.info("Stopped watching — the task may still finish upstream");
@@ -630,13 +659,18 @@ export function VideoStudio({
                 )}
 
                 <div>
-                  <label className="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  <label
+                    htmlFor="video-prompt"
+                    className="mb-1.5 block text-xs font-semibold text-slate-600 dark:text-slate-300"
+                  >
                     {isAgnes ? "Prompt" : "Motion prompt"}
                   </label>
                   <Textarea
+                    id="video-prompt"
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     rows={3}
+                    aria-describedby="video-prompt-hint"
                   />
                 </div>
 
@@ -744,6 +778,11 @@ export function VideoStudio({
                             {jobId ? `task ${jobId} · ` : "queueing…"}
                             {progress}% reported by the provider
                           </p>
+                          {providerNote && (
+                            <p className="mx-auto mt-2 max-w-xs text-[10px] leading-relaxed text-[#94A3B8]">
+                              {providerNote}
+                            </p>
+                          )}
                         </>
                       ) : (
                         <p className="text-xs text-[#94A3B8]">
@@ -807,6 +846,22 @@ export function VideoStudio({
                         ? "Agnes can start from text alone — describe the scene, then press Generate."
                         : "No clip yet. Generate an image in Image Studio first, then animate it here."}
                     </p>
+                    {isAgnes && jobId && (
+                      <div className="flex max-w-xs flex-col items-center gap-2">
+                        <p className="text-[11px] leading-relaxed text-[#94A3B8]">
+                          {providerNote}
+                        </p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="gap-1.5"
+                          onClick={resumeWatching}
+                        >
+                          <RefreshCw className="h-3.5 w-3.5" />
+                          Keep watching task {jobId}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>

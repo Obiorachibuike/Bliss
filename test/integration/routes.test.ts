@@ -20,14 +20,24 @@ describe("POST /api/chat", () => {
   it("relays the prompt to the selected upstream model and returns the text", async () => {
     const fetchMock = vi.fn(async (url: string) => {
       expect(url).toContain("/cvronai/gemini-2.5-flash-lite.php");
-      return Response.json({ success: true, response: "Hi from Gemini", author: "@cvroon" });
+      return Response.json({
+        success: true,
+        response: "Hi from Gemini",
+        author: "@cvroon",
+      });
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const res = await chatPOST(req({ model: "gemini-2.5-flash-lite", prompt: "hello" }));
+    const res = await chatPOST(
+      req({ model: "gemini-2.5-flash-lite", prompt: "hello" }),
+    );
     expect(res.status).toBe(200);
     const json = await res.json();
-    expect(json).toMatchObject({ success: true, response: "Hi from Gemini", model: "gemini-2.5-flash-lite" });
+    expect(json).toMatchObject({
+      success: true,
+      response: "Hi from Gemini",
+      model: "gemini-2.5-flash-lite",
+    });
   });
 
   it("folds recent history into a single prompt because the endpoint has no context", async () => {
@@ -35,9 +45,11 @@ describe("POST /api/chat", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string) => {
-        sent = decodeURIComponent(new URL(url).searchParams.get("prompt") ?? "");
+        sent = decodeURIComponent(
+          new URL(url).searchParams.get("prompt") ?? "",
+        );
         return Response.json({ success: true, response: "ok" });
-      })
+      }),
     );
 
     await chatPOST(
@@ -48,13 +60,15 @@ describe("POST /api/chat", () => {
           { role: "user", content: "first question" },
           { role: "assistant", content: "first answer" },
         ],
-      })
+      }),
     );
 
     expect(sent).toContain("first question");
     expect(sent).toContain("first answer");
     expect(sent).toContain("and now?");
-    expect(sent.indexOf("first question")).toBeLessThan(sent.indexOf("and now?"));
+    expect(sent.indexOf("first question")).toBeLessThan(
+      sent.indexOf("and now?"),
+    );
   });
 
   it("ignores history entries that are not chat turns", async () => {
@@ -62,9 +76,11 @@ describe("POST /api/chat", () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: string) => {
-        sent = decodeURIComponent(new URL(url).searchParams.get("prompt") ?? "");
+        sent = decodeURIComponent(
+          new URL(url).searchParams.get("prompt") ?? "",
+        );
         return Response.json({ success: true, response: "ok" });
-      })
+      }),
     );
     await chatPOST(
       req({
@@ -76,7 +92,7 @@ describe("POST /api/chat", () => {
           { role: "user", content: "" },
           { role: "user", content: "real" },
         ],
-      })
+      }),
     );
     expect(sent).not.toContain("SECRET-SYSTEM");
     expect(sent).not.toContain("TOOL-NOISE");
@@ -86,25 +102,39 @@ describe("POST /api/chat", () => {
   it("rejects a model outside the verified allow-list", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    const res = await chatPOST(req({ model: "gpt-6-turbo-pro-max", prompt: "hi" }));
+    const res = await chatPOST(
+      req({ model: "gpt-6-turbo-pro-max", prompt: "hi" }),
+    );
     expect(res.status).toBe(400);
     expect((await res.json()).error).toMatch(/isn't supported/i);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("rejects an empty prompt and malformed JSON", async () => {
-    expect((await chatPOST(req({ model: "llama", prompt: "  " }))).status).toBe(400);
+    expect((await chatPOST(req({ model: "llama", prompt: "  " }))).status).toBe(
+      400,
+    );
     expect((await chatPOST(req("{oops"))).status).toBe(400);
   });
 
   it("rejects oversized prompts", async () => {
-    const res = await chatPOST(req({ model: "llama", prompt: "a".repeat(25_000) }));
+    const res = await chatPOST(
+      req({ model: "llama", prompt: "a".repeat(25_000) }),
+    );
     expect(res.status).toBe(413);
   });
 
   it("returns a friendly 502 — never a fake answer — when the upstream is down", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("x", { status: 503, statusText: "Unavailable" })));
-    const res = await chatPOST(req({ model: "llama", prompt: "hi" }, { "x-forwarded-for": "9.9.9.1" }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response("x", { status: 503, statusText: "Unavailable" }),
+      ),
+    );
+    const res = await chatPOST(
+      req({ model: "llama", prompt: "hi" }, { "x-forwarded-for": "9.9.9.1" }),
+    );
     expect(res.status).toBe(502);
     const json = await res.json();
     expect(json.success).toBe(false);
@@ -115,9 +145,16 @@ describe("POST /api/chat", () => {
   it("does not leak internals when an HTML error page is served", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => Response.json({ success: true, response: "<html>stack trace at /var/www/llama.php line 42</html>" }))
+      vi.fn(async () =>
+        Response.json({
+          success: true,
+          response: "<html>stack trace at /var/www/llama.php line 42</html>",
+        }),
+      ),
     );
-    const res = await chatPOST(req({ model: "llama", prompt: "hi" }, { "x-forwarded-for": "9.9.9.2" }));
+    const res = await chatPOST(
+      req({ model: "llama", prompt: "hi" }, { "x-forwarded-for": "9.9.9.2" }),
+    );
     const json = await res.json();
     // The upstream returned an HTML body inside a valid JSON envelope; the route must not
     // forward raw stack traces as an error. It should either be echoed as content or a clean error.
@@ -126,11 +163,16 @@ describe("POST /api/chat", () => {
   });
 
   it("rate limits a chatty IP", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ success: true, response: "ok" })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ success: true, response: "ok" })),
+    );
     const ip = "203.0.113.7";
     let limited = false;
     for (let i = 0; i < 25; i++) {
-      const res = await chatPOST(req({ model: "llama", prompt: `msg ${i}` }, { "x-forwarded-for": ip }));
+      const res = await chatPOST(
+        req({ model: "llama", prompt: `msg ${i}` }, { "x-forwarded-for": ip }),
+      );
       if (res.status === 429) {
         limited = true;
         expect((await res.json()).error).toMatch(/wait a minute/i);
@@ -148,8 +190,11 @@ describe("POST /api/image", () => {
       "fetch",
       vi.fn(async (url: string) => {
         expect(url).toContain("/cvronai/flux-dev.php");
-        return Response.json({ success: true, image_url: "https://cdn.test/img-1.jpg" });
-      })
+        return Response.json({
+          success: true,
+          image_url: "https://cdn.test/img-1.jpg",
+        });
+      }),
     );
     const res = await imagePOST(req({ prompt: "a blue planet" }, {}) as never);
     expect(res.status).toBe(200);
@@ -163,15 +208,25 @@ describe("POST /api/image", () => {
   });
 
   it("surfaces a generation failure instead of a placeholder image", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ success: false, message: "gpu busy" })));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ success: false, message: "gpu busy" })),
+    );
     const res = await imagePOST(req({ prompt: "anything" }) as never);
     expect(res.status).toBe(502);
     expect((await res.json()).imageUrl).toBeUndefined();
   });
 
   it("requires a safe source url for edits", async () => {
-    for (const bad of ["", "ftp://host/a.jpg", "file:///etc/passwd", "javascript:alert(1)"]) {
-      const res = await imagePOST(req({ mode: "edit", prompt: "make it night", imageUrl: bad }) as never);
+    for (const bad of [
+      "",
+      "ftp://host/a.jpg",
+      "file:///etc/passwd",
+      "javascript:alert(1)",
+    ]) {
+      const res = await imagePOST(
+        req({ mode: "edit", prompt: "make it night", imageUrl: bad }) as never,
+      );
       expect(res.status).toBe(400);
     }
   });
@@ -182,11 +237,18 @@ describe("POST /api/image", () => {
       "fetch",
       vi.fn(async (url: string) => {
         seen = url;
-        return Response.json({ success: true, image_url: "https://cdn.test/edit.jpg" });
-      })
+        return Response.json({
+          success: true,
+          image_url: "https://cdn.test/edit.jpg",
+        });
+      }),
     );
     const res = await imagePOST(
-      req({ mode: "edit", prompt: "make it night", imageUrl: "https://host/a.jpg" }) as never
+      req({
+        mode: "edit",
+        prompt: "make it night",
+        imageUrl: "https://host/a.jpg",
+      }) as never,
     );
     expect(res.status).toBe(200);
     const u = new URL(seen);
@@ -217,15 +279,23 @@ describe("POST /api/video", () => {
       "fetch",
       vi.fn(async (url: string) => {
         seen = url;
-        return Response.json({ success: true, videoUrl: "https://cdn.test/clip.mp4" });
-      })
+        return Response.json({
+          success: true,
+          videoUrl: "https://cdn.test/clip.mp4",
+        });
+      }),
     );
     const res = await videoPOST(
-      req({ prompt: "drifting clouds", imageUrl: "https://host/sky.jpg" }) as never
+      req({
+        prompt: "drifting clouds",
+        imageUrl: "https://host/sky.jpg",
+      }) as never,
     );
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({
       success: true,
+      // `async:false` is the honest counterpart of an Agnes job id: this path blocks.
+      async: false,
       videoUrl: "https://cdn.test/clip.mp4",
       model: "wan-2.2",
       provider: "cvron",
@@ -237,8 +307,13 @@ describe("POST /api/video", () => {
   });
 
   it("reports an incomplete job as a failure rather than inventing a url", async () => {
-    vi.stubGlobal("fetch", vi.fn(async () => Response.json({ success: true })));
-    const res = await videoPOST(req({ prompt: "move", imageUrl: "https://host/a.jpg" }) as never);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ success: true })),
+    );
+    const res = await videoPOST(
+      req({ prompt: "move", imageUrl: "https://host/a.jpg" }) as never,
+    );
     expect(res.status).toBe(502);
     const json = await res.json();
     expect(json.videoUrl).toBeUndefined();
@@ -256,13 +331,10 @@ describe("context prompt adapter", () => {
   });
 
   it("wraps turns in an explicit dialogue the model can follow", () => {
-    const out = buildContextPrompt(
-      "and tomorrow?",
-      [
-        { role: "user", content: "will it rain?" },
-        { role: "assistant", content: "yes, heavy rain." },
-      ]
-    );
+    const out = buildContextPrompt("and tomorrow?", [
+      { role: "user", content: "will it rain?" },
+      { role: "assistant", content: "yes, heavy rain." },
+    ]);
     expect(out.startsWith("You are Bliss"));
     expect(out).toContain("User: will it rain?");
     expect(out).toContain("Assistant: yes, heavy rain.");
@@ -283,7 +355,10 @@ describe("context prompt adapter", () => {
   });
 
   it("stays inside the documented 4000 char budget and keeps the newest turns", () => {
-    const huge = Array.from({ length: 40 }, (_, i) => ({ role: i % 2 ? "assistant" : "user", content: `t${i} ${"x".repeat(400)}` }));
+    const huge = Array.from({ length: 40 }, (_, i) => ({
+      role: i % 2 ? "assistant" : "user",
+      content: `t${i} ${"x".repeat(400)}`,
+    }));
     const out = buildContextPrompt("the final question", huge as never);
     expect(out.length).toBeLessThanOrEqual(4000);
     expect(out).toContain("the final question");
@@ -292,11 +367,16 @@ describe("context prompt adapter", () => {
   });
 
   it("truncates a prompt that alone exceeds the budget", () => {
-    expect(buildContextPrompt("y".repeat(9000), []).length).toBeLessThanOrEqual(4000);
+    expect(buildContextPrompt("y".repeat(9000), []).length).toBeLessThanOrEqual(
+      4000,
+    );
   });
 
   it("caps each turn so one giant message can't evict the whole thread", () => {
-    const out = buildContextPrompt("next", [{ role: "user", content: "z".repeat(50_000) }, { role: "assistant", content: "short" }] as never);
+    const out = buildContextPrompt("next", [
+      { role: "user", content: "z".repeat(50_000) },
+      { role: "assistant", content: "short" },
+    ] as never);
     expect(out).toContain("short");
     expect(out.length).toBeLessThanOrEqual(4000);
   });
@@ -312,7 +392,9 @@ describe("context prompt adapter", () => {
 describe("GET /api/health", () => {
   it("reports capability truthfully and caches the probe", async () => {
     vi.resetModules();
-    const fetchMock = vi.fn(async () => Response.json({ success: true, response: "pong" }));
+    const fetchMock = vi.fn(async () =>
+      Response.json({ success: true, response: "pong" }),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     const { GET } = await import("@/app/api/health/route");
@@ -336,9 +418,12 @@ describe("GET /api/health", () => {
 
   it("degrades honestly when the provider is down", async () => {
     vi.resetModules();
-    vi.stubGlobal("fetch", vi.fn(async () => {
-      throw new Error("socket hang up");
-    }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new Error("socket hang up");
+      }),
+    );
 
     const { GET } = await import("@/app/api/health/route");
     const res = await (GET() as Promise<Response>);

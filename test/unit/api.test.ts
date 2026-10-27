@@ -10,13 +10,15 @@ import { MODELS, ENDPOINTS, API_LIMITATIONS } from "@/lib/api/config";
 describe("model configuration", () => {
   it("exposes exactly the four text models documented in FreeAiAPIs", () => {
     expect(MODELS.map((m) => m.id).sort()).toEqual(
-      ["deepseek-v3.2", "gemini-2.5-flash-lite", "gpt-5-nano", "llama"].sort()
+      ["deepseek-v3.2", "gemini-2.5-flash-lite", "gpt-5-nano", "llama"].sort(),
     );
   });
 
   it("maps every model to a real cvron endpoint", () => {
     for (const m of MODELS) {
-      expect(m.endpoint).toMatch(/^https:\/\/cvron\.alwaysdata\.net\/cvronai\/.+\.php$/);
+      expect(m.endpoint).toMatch(
+        /^https:\/\/cvron\.alwaysdata\.net\/cvronai\/.+\.php$/,
+      );
     }
     expect(ENDPOINTS.chat.llama.endsWith("llama.php")).toBe(true);
     expect(ENDPOINTS.image.fluxDev.endsWith("flux-dev.php")).toBe(true);
@@ -45,7 +47,7 @@ describe("request construction", () => {
       vi.fn(async (u: string) => {
         calls.push(String(u));
         return Response.json({ success: true, response: "hi" });
-      })
+      }),
     );
 
     const { generateText } = await import("@/lib/api/text");
@@ -62,7 +64,9 @@ describe("request construction", () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
     const { generateText } = await import("@/lib/api/text");
-    await expect(generateText("llama", "a".repeat(API_LIMITATIONS.maxPromptLength + 1))).rejects.toThrow(/too long/i);
+    await expect(
+      generateText("llama", "a".repeat(API_LIMITATIONS.maxPromptLength + 1)),
+    ).rejects.toThrow(/too long/i);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -77,7 +81,9 @@ describe("request construction", () => {
  * ------------------------------------------------------------------ */
 describe("response validation", () => {
   it("accepts the documented success shape", () => {
-    expect(parseChatPayload({ success: true, response: " Hello ", prompt: "hi" })).toBe("Hello");
+    expect(
+      parseChatPayload({ success: true, response: " Hello ", prompt: "hi" }),
+    ).toBe("Hello");
   });
 
   it("accepts alternate content keys some upstreams return", () => {
@@ -86,21 +92,32 @@ describe("response validation", () => {
   });
 
   it("throws when success:false", () => {
-    expect(() => parseChatPayload({ success: false, message: "model busy" })).toThrow(/model busy/);
+    expect(() =>
+      parseChatPayload({ success: false, message: "model busy" }),
+    ).toThrow(/model busy/);
   });
 
   it("throws on an HTML error page served with status 200", () => {
-    expect(() => parseChatPayload("<html><body>502 Bad Gateway</body></html>")).toThrow(/HTML instead of JSON/);
+    expect(() =>
+      parseChatPayload("<html><body>502 Bad Gateway</body></html>"),
+    ).toThrow(/HTML instead of JSON/);
   });
 
   it("throws when no usable content exists", () => {
-    expect(() => parseChatPayload({ success: true })).toThrow(/no usable response/i);
+    expect(() => parseChatPayload({ success: true })).toThrow(
+      /no usable response/i,
+    );
     expect(() => parseChatPayload(null)).toThrow(/unexpected response/i);
-    expect(() => parseChatPayload({ response: "   " })).toThrow(/no usable response/i);
+    expect(() => parseChatPayload({ response: "   " })).toThrow(
+      /no usable response/i,
+    );
   });
 
   it("retries transient failures then surfaces the error", async () => {
-    const fetchMock = vi.fn(async () => new Response("boom", { status: 500, statusText: "Server Error" }));
+    const fetchMock = vi.fn(
+      async () =>
+        new Response("boom", { status: 500, statusText: "Server Error" }),
+    );
     vi.stubGlobal("fetch", fetchMock);
     const { generateText } = await import("@/lib/api/text");
     await expect(generateText("llama", "hello")).rejects.toThrow(/500/);
@@ -109,7 +126,10 @@ describe("response validation", () => {
   });
 
   it("does not retry a client-side 4xx", async () => {
-    const fetchMock = vi.fn(async () => new Response("nope", { status: 404, statusText: "Not Found" }));
+    const fetchMock = vi.fn(
+      async () =>
+        new Response("nope", { status: 404, statusText: "Not Found" }),
+    );
     vi.stubGlobal("fetch", fetchMock);
     const { generateText } = await import("@/lib/api/text");
     await expect(generateText("llama", "hello")).rejects.toThrow(/404/);
@@ -157,6 +177,8 @@ describe("conversation title generation", () => {
   });
 
   it("collapses newlines so titles stay single-line", () => {
-    expect(generateTitle("line one\nline two\ttabbed")).toBe("line one line two tabbed");
+    expect(generateTitle("line one\nline two\ttabbed")).toBe(
+      "line one line two tabbed",
+    );
   });
 });

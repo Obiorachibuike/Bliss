@@ -347,6 +347,9 @@ export interface VideoJob {
   status: string;
   progress: number;
   error?: string;
+  /** True when Bliss refused the input itself (HTTP 400 territory), as opposed to the
+   *  provider being unreachable or erroring. */
+  rejected?: boolean;
 }
 
 export async function startAgnesVideo(
@@ -374,12 +377,15 @@ export async function startAgnesVideo(
       progress: task.progress,
     };
   } catch (e: unknown) {
+    const rejected = (e as { rejected?: boolean } | null)?.rejected === true;
     return {
       jobId: "",
       model,
       provider: "agnes",
       status: "failed",
       progress: 0,
+      // `rejected:true` means nothing was ever sent upstream, so the route can answer 400.
+      ...(rejected ? { rejected: true } : {}),
       error:
         e instanceof Error
           ? e.message

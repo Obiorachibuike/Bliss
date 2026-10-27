@@ -125,6 +125,32 @@ export function ModelSelector({
                           <ShieldCheck className="h-2.5 w-2.5" /> fallback
                         </span>
                       )}
+                      {m.fallback && m.billed && (
+                        <span
+                          className={cn(
+                            "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
+                            value === m.id
+                              ? "bg-white/20 text-white"
+                              : "bg-[#F59E0B]/10 text-amber-600 dark:text-amber-400",
+                          )}
+                          title="Agnes bills this model at its published per-token rates"
+                        >
+                          billed per token
+                        </span>
+                      )}
+                      {m.fallback && !m.billed && (
+                        <span
+                          className={cn(
+                            "text-[10px] px-1.5 py-0.5 rounded-full font-medium",
+                            value === m.id
+                              ? "bg-white/20 text-white"
+                              : "bg-[#22C55E]/10 text-[#16A34A] dark:text-[#4ADE80]",
+                          )}
+                          title="Documented at $0 for now — a promotion, not a permanent price"
+                        >
+                          $0 promo
+                        </span>
+                      )}
                       {value === m.id && <Check className="w-4 h-4 ml-auto" />}
                     </div>
                     <p

@@ -2,16 +2,19 @@
 
 > **Your ideas. Infinite possibilities.**
 
-> Live deployment: **https://bliss-ai-iota.vercel.app** · production build `52cd7b7`, verified 2026-10-25.
-> `/api/models` on that deployment returns the four key-less models plus `agnes-2.5-flash` and
-> `fallback: { enabled: false }` — this deployment deliberately carries no `AGNES_API_KEY`, so the fallback is
-> documented and armed, never silently active. The live probe (`/api/health`, 2026-10-25 20:26 UTC) reported `status: operational` with
+> Live deployment: **https://bliss-ai-iota.vercel.app** · verified 2026-10-25 (re-verified after each deploy).
+> `/api/models` on that deployment returns every key-less model plus the documented Agnes chat, image and video ids,
+> with `fallback: { enabled: false, videoModel: null, textToVideo: false }` — this deployment deliberately carries no
+> `AGNES_API_KEY`, so the optional provider is documented and armed, never silently active (its pickers stay visible
+> and explain what to set). The live probe (`/api/health`, 2026-10-25 20:26 UTC) reported `status: operational` with
 > the text upstream answering HTTP 200 and a valid JSON payload while the image endpoint answered 503 — which the
 > app surfaces as a degraded banner instead of a fake success. `/api/health` and `/api/models` now answer with
 > `Cache-Control: no-store`, so an intermediary can never serve a stale copy of either.
 
-Bliss is an all-in-one AI workspace: multi-model chat, image generation, AI image editing and image-to-video
-creation — wrapped in one blue-gradient, glass-lit interface that works on desktop, tablet and mobile.
+Bliss is an all-in-one AI workspace: multi-model chat, image generation, AI image editing and video creation (both
+image-to-video and asynchronous text / keyframe / reference tasks) — wrapped in one blue-gradient, glass-lit
+interface that works on desktop, tablet and mobile. Every capability has a real model picker wired to the endpoint
+that actually answers it.
 
 Built on the free, key-less endpoints documented in
 **[cvroon-api/FreeAiAPIs](https://github.com/cvroon-api/FreeAiAPIs)**, integrated through a controlled Next.js
@@ -39,26 +42,27 @@ server layer so the browser never talks to the upstream directly — with an **o
 
 ## What actually works
 
-| Area | Status | Notes |
-| --- | --- | --- |
-| Multi-model chat | ✅ Working | Llama 3.3 · GPT‑5 Nano · Gemini 2.5 Flash Lite · DeepSeek V3.2 |
-| Model switching | ✅ Working | Selection is sent to the matching upstream endpoint — not cosmetic |
-| Markdown + syntax highlighting | ✅ Working | GFM tables, task lists, fenced code with per-block copy |
-| Edit / regenerate / copy | ✅ Working | Editing a turn forks the thread from that point |
-| Conversation history | ✅ Working | Renamed, searchable, pinnable, persisted in `localStorage` |
-| Image generation | ✅ Wired to `flux-dev.php` | One image per call; 1–4 per batch |
-| Image editing | ✅ Wired to `image2image.php` | Requires a **public image URL** (endpoint cannot take uploads) |
-| Image-to-video | ✅ Wired to `wan22.php` | Long-running single request, live elapsed timer |
-| Saved library | ✅ Working | Responses, images, video refs, code snippets |
-| Themes | ✅ Working | Light / dark / system, persisted, applied pre-paint (no flash) |
-| Automatic provider fallback | ✅ Working (opt-in) | Chat + images retry on Agnes AI when `AGNES_API_KEY` is set |
-| Vision / image analysis | 🔓 Fallback only | No key-less endpoint exists; with a key, pasted image URLs are analysed via `image_url` |
-| Streaming | ⛔ Not supported | Neither path streams in Bliss — an honest *Thinking…* state is shown instead |
-| Text-to-video | ⛔ Not supported | Only image-to-video exists on the primary provider |
-| Server database | ⛔ Not required | Anonymous-first; see [Deployment](#deployment) |
+| Area                              | Status                        | Notes                                                                                                         |
+| --------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Multi-model chat                  | ✅ Working                    | Llama 3.3 · GPT‑5 Nano · Gemini 2.5 Flash Lite · DeepSeek V3.2 (+ 4 Agnes models with a key)                  |
+| Model switching                   | ✅ Working                    | Every picker is catalogue-driven: the choice is sent to the matching upstream endpoint — not cosmetic         |
+| Markdown + syntax highlighting    | ✅ Working                    | GFM tables, task lists, fenced code with per-block copy                                                       |
+| Edit / regenerate / copy          | ✅ Working                    | Editing a turn forks the thread from that point                                                               |
+| Conversation history              | ✅ Working                    | Renamed, searchable, pinnable, persisted in `localStorage`                                                    |
+| Image generation                  | ✅ Wired to `flux-dev.php`    | One image per call; 1–4 per batch                                                                             |
+| Image editing                     | ✅ Wired to `image2image.php` | Requires a **public image URL** (endpoint cannot take uploads)                                                |
+| Image-to-video                    | ✅ Wired to `wan22.php`       | Long-running single request, live elapsed timer                                                               |
+| Text / keyframe / reference video | ✅ Working (needs key)        | Agnes `agnes-video-2.5-flash` and `agnes-video-2.5` as real async tasks the browser polls                     |
+| Saved library                     | ✅ Working                    | Responses, images, video refs, code snippets                                                                  |
+| Themes                            | ✅ Working                    | Light / dark / system, persisted, applied pre-paint (no flash)                                                |
+| Automatic provider fallback       | ✅ Working (opt-in)           | Chat + images retry on Agnes AI when `AGNES_API_KEY` is set                                                   |
+| Vision / image analysis           | 🔓 Fallback only              | No key-less endpoint exists; with a key, pasted image URLs are analysed via `image_url`                       |
+| Streaming                         | ⛔ Not supported              | The key-less provider cannot stream and Bliss does not fake it — an honest _Thinking…_ state is shown instead |
+| Video-to-video                    | 🔓 One model only             | Reference videos exist solely on `agnes-video-2.5`; the key-less provider has no such endpoint                |
+| Server database                   | ⛔ Not required               | Anonymous-first; see [Deployment](#deployment)                                                                |
 
 Bliss never simulates an unsupported capability. Where a provider cannot do something, the UI says so — and a
-capability that only exists behind the fallback key is labelled *fallback only*, never presented as working on the
+capability that only exists behind the fallback key is labelled _fallback only_, never presented as working on the
 free path.
 
 ## Fallback provider (Agnes AI)
@@ -70,28 +74,47 @@ route a failed request to a second, documented provider instead of showing an er
 AGNES_API_KEY=sk-…            # server-only; get one at https://platform.agnes-ai.com
 ```
 
-| Behaviour | Without a key | With a key |
-| --- | --- | --- |
-| Chat | CVRON only, honest 502 on failure | retry once on `agnes-2.5-flash` (`POST /v1/chat/completions`) |
-| Images | `flux-dev` / `image2image` only | retry on `agnes-image-2.1-flash` (`POST /v1/images/generations`) |
-| Conversation context | flattened 1-prompt digest (≤8 turns) | genuine `messages` array: last 12 turns + system prompt |
-| Vision | URL pasted as text, labelled as unanalysed | real `image_url` content part, analysed by the model |
-| Video | WAN 2.2 only | **unchanged** — Agnes video contracts are not verified, so Bliss does not wire them up |
+| Behaviour            | Without a key                              | With a key                                                                                                                     |
+| -------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| Chat                 | CVRON only, honest 502 on failure          | retry once on `agnes-2.5-flash` (`POST /v1/chat/completions`)                                                                  |
+| Images               | `flux-dev` / `image2image` only            | retry on `agnes-image-2.1-flash` (`POST /v1/images/generations`)                                                               |
+| Conversation context | flattened 1-prompt digest (≤8 turns)       | genuine `messages` array: last 12 turns + system prompt                                                                        |
+| Vision               | URL pasted as text, labelled as unanalysed | real `image_url` content part, analysed by the model                                                                           |
+| Video                | WAN 2.2 only, synchronous                  | **asynchronous tasks**: `POST /v1/videos` returns a `video_id`, then `GET /agnesapi?video_id=…&model_name=…` until `completed` |
 
 Design decisions baked into this path:
 
 - **Strictly optional.** No key ⇒ the app behaves exactly as before; `/api/models` and `/api/health` report
-  `fallback.enabled: false`, Settings says *"not configured"*, and every fallback-only affordance disappears.
+  `fallback.enabled: false`, Settings says _"not configured"_, and every fallback-only affordance disappears.
 - **Never a silent substitution.** Every success carries `provider` + `fallbackUsed`; a fallback reply is badged
-  *via Agnes AI* in the thread, in Image Studio and in History.
+  _via Agnes AI_ in the thread, in Image Studio and in History.
 - **Secret containment.** `AGNES_API_KEY` is read in exactly one module (`src/lib/api/fallback-env.ts`), which resolves
   to an empty string whenever `window` exists, and is re-exported nowhere that a client component can reach. Only the
   derived boolean crosses to the browser.
 - **Quota respect.** The fallback is never probed by `/api/health`, retries once at most (documented free tier is
   ~20 executable RPM), caps output at `max_tokens: 2048`, and honours the caller's abort signal — a stopped
   generation never triggers a fallback request.
-- **Explicit choice beats fallback.** Selecting *Agnes 2.5 Flash* (or the Agnes image model) routes straight there and
-  is never answered by the key-less provider; without a key it returns a clear `400` telling you what to set.
+- **Explicit choice beats fallback.** Selecting _Agnes 2.5 Flash_ (or an Agnes image / video model) routes straight
+  there and is never answered by the key-less provider; without a key it returns a clear `400` telling you what to set.
+- **Video has no fallback, by design.** The two video endpoints take genuinely different inputs (WAN needs a source
+  image, Agnes offers text / keyframe / reference), so a failure stays a failure instead of becoming a guess.
+
+### Choosing a model
+
+Model choice is a first-class part of the UI, not a settings afterthought. The pickers read `GET /api/models`, so
+what is offered is exactly what the deployment can answer:
+
+| Surface                                                       | Pickers                                                                                                                                                                | What the choice changes                                                                                                                                 |
+| ------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chat (composer + welcome cards, and Settings → default model) | `llama`, `gpt-5-nano`, `gemini-2.5-flash-lite`, `deepseek-v3.2`, `agnes-2.5-flash`, `agnes-3.0-flash`, `agnes-2.5-pro`, `agnes-2.5-pro-beta`                           | which upstream endpoint answers, and whether a real `messages` array with `temperature` / `max_tokens` is used; Agnes replies are badged _via Agnes AI_ |
+| Image Studio                                                  | `flux-dev` (key-less) or any of `agnes-image-2.0-flash`, `agnes-image-2.1-flash`, `agnes-image-2.5-flash`, plus a `1K–4K` output tier and 8 aspect ratios              | synchronous 1-image call vs the documented `images/generations` body; an explicit Agnes id is never answered by `flux-dev`                              |
+| Video Studio                                                  | `wan-2.2` (key-less, synchronous) or `agnes-video-2.5-flash` / `agnes-video-2.5`, with mode (`text` / `keyframe` / `reference`), `4–12s` duration, size tier and ratio | one long request vs a job id the browser polls; the billed model is labelled _billed_, the promo model _$0 promo_                                       |
+| Explore models                                                | every catalogue entry with provider, capabilities, endpoint and its honest limitation                                                                                  | jump straight into the matching studio with that model preselected                                                                                      |
+
+Everything outside that table is deliberately absent: `agnes-2.0-flash` is deprecated upstream and `agnes-3.0-pro` is
+"coming soon", so neither appears in the catalogue; `width` / `height` / `fps` / `num_frames` / `quality` /
+`num_inference_steps` are rejected by Agnes with a `400`, so Bliss never sends them; and no model claims vision,
+streaming or video-to-video it does not have.
 
 ## Tech stack
 
@@ -111,7 +134,7 @@ npm run dev            # http://localhost:3000
 ```bash
 npm run build          # production build
 npm run start          # serve the production build
-npm test               # 149 unit + integration + component tests
+npm test               # 194 unit + integration + component tests
 npm run lint           # eslint
 npm run typecheck      # tsc --noEmit
 npx playwright install && npm run test:e2e   # browser suite (desktop / iPhone / iPad)
@@ -121,14 +144,15 @@ npx playwright install && npm run test:e2e   # browser suite (desktop / iPhone /
 
 Bliss runs with **zero** configuration: the upstream is a free, key-less API and all user data lives in the browser.
 
-| Variable | Required | Default | Purpose |
-| --- | --- | --- | --- |
-| `BLESS_API_BASE` | No | `https://cvron.alwaysdata.net` | Override the upstream host (mirrors, self-hosted gateway) |
-| `AGNES_API_KEY` | No | — | Enables the optional Agnes AI fallback (chat, images, vision). **Server-only** |
-| `AGNES_CHAT_MODEL` | No | `agnes-2.5-flash` | Which documented Agnes chat model answers the fallback (`agnes-3.0-flash` also accepted) |
-| `AGNES_IMAGE_MODEL` | No | `agnes-image-2.1-flash` | Agnes model used for generation / editing |
-| `AGNES_BASE_URL` | No | `https://apihub.agnes-ai.com/v1` | Point the fallback at another OpenAI-compatible gateway |
-| `PORT` | No | `3000` | Listen port for `npm run start` |
+| Variable            | Required | Default                          | Purpose                                                                                  |
+| ------------------- | -------- | -------------------------------- | ---------------------------------------------------------------------------------------- |
+| `BLESS_API_BASE`    | No       | `https://cvron.alwaysdata.net`   | Override the upstream host (mirrors, self-hosted gateway)                                |
+| `AGNES_API_KEY`     | No       | —                                | Enables the optional Agnes AI provider (chat, images, vision, video). **Server-only**    |
+| `AGNES_CHAT_MODEL`  | No       | `agnes-2.5-flash`                | Which documented Agnes chat model answers the fallback (`agnes-3.0-flash` also accepted) |
+| `AGNES_IMAGE_MODEL` | No       | `agnes-image-2.1-flash`          | Agnes model used for generation / editing when none is chosen                            |
+| `AGNES_VIDEO_MODEL` | No       | `agnes-video-2.5-flash`          | Agnes model used for a video task when none is chosen                                    |
+| `AGNES_BASE_URL`    | No       | `https://apihub.agnes-ai.com/v1` | Point the fallback at another OpenAI-compatible gateway                                  |
+| `PORT`              | No       | `3000`                           | Listen port for `npm run start`                                                          |
 
 Copy the template if you want to change anything:
 
@@ -148,7 +172,8 @@ src/
 │  ├─ api/
 │  │  ├─ chat/route.ts     POST  model allow-list → context adapter → upstream (timeout + retry)
 │  │  ├─ image/route.ts    POST  generate | edit  (validated image_url)
-│  │  ├─ video/route.ts    POST  image-to-video (maxDuration 300s)
+│  │  ├─ video/route.ts    POST  WAN sync clip · Agnes async job (maxDuration 300s)
+│  │  │                        GET   /api/video?jobId=…&model=…  one status poll, proxied
 │  │  ├─ models/route.ts   GET   verified catalogue + limitations
 │  │  └─ health/route.ts   GET   live probe of the upstream
 │  ├─ layout.tsx           theme bootstrap, metadata, manifest, toaster
@@ -156,6 +181,7 @@ src/
 ├─ lib/
 │  ├─ api/config.ts         single source of truth for endpoints + models + limits (both providers)
 │  ├─ api/fallback-env.ts   the ONLY reader of AGNES_API_KEY (server-guarded)
+│  ├─ api/rate-limit.ts     shared per-IP fixed-window buckets (chat, video create, video poll)
 │  ├─ api/agnes.ts          Agnes client: chat completions + image generations, payload validation
 │  ├─ api/provider.ts       routing chain: primary → fallback, honest errors, message building
 │  ├─ api/text.ts           LLM call, retry, response validation, payload parsing
@@ -169,7 +195,7 @@ src/
    ├─ layout/               Sidebar · Logo · ThemeProvider
    ├─ chat/                 Composer · MessageList · MarkdownRenderer · ModelSelector · ContextPanel · WelcomeScreen · ProviderBadge
    ├─ image/                ImageStudio (generate + edit tabs, gallery, lightbox)
-   ├─ video/                VideoStudio (source URL, motion prompt, elapsed timer)
+   ├─ video/                VideoStudio (engine + mode picker, task settings, progress, stop / keep watching)
    └─ ui/                   Button · Card · Input · Badge · Toast · Lightbox
 ```
 
@@ -209,19 +235,31 @@ POST https://apihub.agnes-ai.com/v1/images/generations
      { model: "agnes-image-2.1-flash", prompt, size: "1K", ratio?: "16:9",
        extra_body: { image?: [url…], response_format: "url" } }
      → { created, data: [{ url | b64_json }] }
+POST https://apihub.agnes-ai.com/v1/videos
+     { model: "agnes-video-2.5-flash", prompt, mode: "text" | "keyframe" | "reference",
+       seconds: "8", size: "720P", aspect_ratio: "16:9", n: 1,
+       first_frame?, last_frame?, images?[], audios?[], videos?: [{ url, start_seconds?, require_audio? }] }
+     → { id, task_id, video_id, object: "video", status: "queued", progress, seconds, size }
+GET  https://apihub.agnes-ai.com/agnesapi?video_id=…&model_name=…      (host root, not /v1)
+     → { status: "queued" | "in_progress" | "completed" | "failed", progress, url, error? }
 ```
 
 Verified against the docs and used exactly as published — `response_format` belongs inside `extra_body`, only
-`data[0].url` is accepted (base64 output is rejected, not pasted into an `<img>`), and the video models are left
-alone because their request/polling contract is not documented to Bliss' satisfaction.
+`data[0].url` is accepted (base64 output is rejected, not pasted into an `<img>`), video `seconds` is a _string_
+(`"4"`–`"12"`), the status poll is a `GET` on the host root that needs `model_name`, only the top-level `url` is
+read (`internal_*` fields are ignored), and every combination the provider answers with `400` is rejected locally
+before a request is made.
 
 Bliss's own routes:
 
 ```http
 POST /api/chat     { model, prompt, history? }  → { success, response, model, answeredBy, provider, fallbackUsed }
-POST /api/image    { mode, prompt, imageUrl?, model?, ratio? } → { success, imageUrl, model, provider, fallbackUsed }
-POST /api/video    { prompt, imageUrl }         → { success, videoUrl, model, provider, fallbackUsed }
-GET  /api/models   → verified catalogue + limitations + fallback status
+POST /api/image    { mode, prompt, imageUrl?, model?, ratio?, size? } → { success, imageUrl, model, provider, fallbackUsed }
+POST /api/video    { prompt, model?, imageUrl?, mode?, seconds?, size?, aspectRatio?, first/lastFrameUrl?, images?[], audios?[], referenceVideoUrl?, seed? }
+                   → { success, async: false, videoUrl, model, provider }      (wan-2.2, synchronous)
+                   → { success, async: true, jobId, model, provider, status, progress, pollIntervalMs, maxWaitMs }  (Agnes job)
+GET  /api/video?jobId=…&model=…   → { success, jobId, status, progress, videoUrl?, error? }   (one poll, key stays server-side)
+GET  /api/models   → verified catalogue (text · image · video) + limitations + fallback status
 GET  /api/health   → live upstream probe + capability matrix + fallback status
 ```
 
@@ -232,24 +270,28 @@ Documented but intentionally **not** exposed in the product: `sslproxy.php`, `ur
 
 These come straight from the provider's documentation and drive real product decisions:
 
-1. **No streaming.** Responses arrive complete. The composer shows a *Thinking…* indicator that reflects actual request
+1. **No streaming.** Responses arrive complete. The composer shows a _Thinking…_ indicator that reflects actual request
    state, and Stop discards the in-flight turn instead of faking a token stream.
 2. **No native conversation context.** Every endpoint takes a single `prompt`. Bliss folds the last ≤8 turns into one
    prompt (`buildContextPrompt`), stays inside the documented length budget, keeps the newest turns when trimming, and
-   strips any echoed `Assistant:` scaffold from the reply. It is context *construction*, not model memory.
+   strips any echoed `Assistant:` scaffold from the reply. It is context _construction_, not model memory.
 3. **Image generation returns one image per call**, from `flux-dev` only, with hosted URLs that may expire. Bliss says
    "copy or download now" instead of promising permanent storage.
 4. **Editing and video need a publicly reachable URL** — the endpoints accept URLs, never multipart uploads. Every
    upload-shaped control is therefore a URL field with the requirement stated inline.
-5. **Video is synchronous.** No job id, no polling endpoint, no callback. Bliss runs one long request (290s client cap,
-   300s route `maxDuration`) with a live elapsed timer, and reports timeouts plainly.
+5. **Video has two execution models, and the UI says which one you are in.** `wan22.php` is synchronous: no job id, no
+   polling endpoint, no callback, so Bliss runs one long request (290s client cap, 300s route `maxDuration`) with a live
+   elapsed timer and reports timeouts plainly. Agnes video is a real task: the route returns a `jobId` immediately and
+   _the browser_ polls `GET /api/video?jobId=…` every 2s, so a serverless timeout can never strand a render —
+   "Stop watching" detaches the tab without claiming the task was cancelled, and "Keep watching" resumes the same id.
 6. **Free-tier reliability.** `cvron.alwaysdata.net` is rate-limited and occasionally offline. Bliss retries transient
    failures, never retries client errors, and surfaces a dismissible banner plus per-message inline errors when the
-   upstream is unreachable. Configuring `AGNES_API_KEY` adds a *real* second attempt — it does not hide the first one:
+   upstream is unreachable. Configuring `AGNES_API_KEY` adds a _real_ second attempt — it does not hide the first one:
    the failure is still reported in the banner, and the answering provider is badged.
-7. **Fallback breadth is intentionally narrow.** Chat, images and image analysis only. Agnes documents streaming and
-   tool calling too, but Bliss renders complete answers and has no tool loop, so those are listed as "documented,
-   unused" in the API Explorer rather than claimed in the UI. Video gets no fallback at all.
+7. **Fallback breadth is intentionally narrow.** Chat, images, image analysis and asynchronous video. Agnes documents
+   streaming and tool calling too, but Bliss renders complete answers and has no tool loop, so those are listed as
+   "documented, unused" in the API Explorer rather than claimed in the UI. There is no cross-provider fallback for
+   video: the two endpoints take different inputs, so a key-less failure stays a failure instead of becoming a guess.
 
 ## Security, privacy & abuse guards
 
@@ -260,8 +302,9 @@ These come straight from the provider's documentation and drive real product dec
 - **SSRF-safe URL handling:** user-supplied image URLs must parse as `http:`/`https:` — `file:`, `javascript:` and
   friends are rejected. Bliss never fetches an arbitrary user URL server-side beyond the documented endpoints.
 - **Body and prompt limits:** JSON parse guarded, 24 000-char message cap, 1 000-char image prompt cap, `413` on overflow.
-- **Rate limiting:** 20 chat requests / minute / IP (`x-forwarded-for`), with opportunistic bucket pruning so a
-  long-lived container cannot leak memory. Pair with Vercel/KV or Upstash for multi-instance precision.
+- **Rate limiting** (`src/lib/api/rate-limit.ts`, per-IP fixed windows on `x-forwarded-for`): 20 chat requests,
+  6 video _creations_ and 90 status polls per minute, with opportunistic bucket pruning so a long-lived container cannot
+  leak memory. Pair with Vercel/KV or Upstash for multi-instance precision.
 - **Response validation:** every upstream payload is parsed and shape-checked; HTML error pages become errors.
 - **No dangerous rendering:** react-markdown without `rehype-raw` — raw HTML in a model response is dropped, never
   injected, and code blocks are highlighted, not executed.
@@ -274,27 +317,30 @@ These come straight from the provider's documentation and drive real product dec
 ## Testing
 
 ```bash
-npm test                                  # 149 unit + integration + component tests
-npm run build && npm run verify:fallback  # 19 end-to-end checks of the fallback chain, offline
+npm test                                  # 194 unit + integration + component tests
+npm run build && npm run verify:fallback  # 34 end-to-end checks of the provider chain, offline
 ```
 
 `npm run verify:fallback` boots the production build against a local stand-in that speaks the documented Agnes
-contract plus a dead primary host, and asserts the real behaviour: provider attribution, `messages` vs digest, the
-`image_url` part, image retry payloads, and honest failures with no key. No request ever leaves `127.0.0.1`.
+contract (including `POST /v1/videos` validation and the `/agnesapi` status ladder) plus a dead primary host, and
+asserts the real behaviour: provider attribution, `messages` vs digest, the `image_url` part, image retry payloads,
+the video job create/poll pair, the rules the provider answers with `400`, and honest failures with no key. No
+request ever leaves `127.0.0.1`.
 
-149 tests across eight files:
+194 tests across nine files:
 
-| Suite | Covers |
-| --- | --- |
-| `test/unit/api.test.ts` | endpoint mapping, request construction, retry/no-retry policy, response validation, prompt & URL checks, title generation |
-| `test/unit/media.test.ts` | image / edit / video / host parsing, HTML-error handling, nested payloads, non-http scheme rejection |
-| `test/unit/stores.test.ts` | conversation CRUD, pin/rename/delete, per-conversation model, search, `localStorage` persistence, saved library, context adapter |
-| `test/unit/components.test.tsx` | welcome screen, composer keys + attachment honesty, model selector, message actions, markdown/code safety, theme |
-| `test/integration/routes.test.ts` | `POST /api/chat`, `/api/image`, `/api/video`: allow-list, limits, rate limit, upstream outage, context folding |
-| `test/integration/fallback.test.ts` | 27 tests: the whole fallback chain — retry on outage, real `messages` vs digest, vision part, explicit-model routing, image fallback payloads, secret containment, honest 502s with no key |
-| `test/unit/fallback-ui.test.tsx` | fallback affordances in the UI: attribution badge, model picker labelling, composer vision hint, Image Studio model chooser |
-| `test/e2e/app-flow.test.tsx` | the full journey through the real component tree (14 steps, upstream mocked at the network boundary) |
-| `e2e/bliss.spec.ts` | Playwright browser suite: desktop, iPhone 14, iPad portrait; overflow + drawer + persistence checks |
+| Suite                                  | Covers                                                                                                                                                                                         |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `test/unit/api.test.ts`                | endpoint mapping, request construction, retry/no-retry policy, response validation, prompt & URL checks, title generation                                                                      |
+| `test/unit/media.test.ts`              | image / edit / video / host parsing, HTML-error handling, nested payloads, non-http scheme rejection                                                                                           |
+| `test/unit/stores.test.ts`             | conversation CRUD, pin/rename/delete, per-conversation model, search, `localStorage` persistence, saved library, context adapter                                                               |
+| `test/unit/components.test.tsx`        | welcome screen, composer keys + attachment honesty, model selector, message actions, markdown/code safety, theme                                                                               |
+| `test/integration/routes.test.ts`      | `POST /api/chat`, `/api/image`, `/api/video`: allow-list, limits, rate limit, upstream outage, context folding                                                                                 |
+| `test/integration/agnes-video.test.ts` | 38 tests: every documented Agnes video rule (mode/media consistency, per-model sizes and ceilings, string seconds), task + status parsing, key containment, route policy and catalogue honesty |
+| `test/integration/fallback.test.ts`    | 27 tests: the whole fallback chain — retry on outage, real `messages` vs digest, vision part, explicit-model routing, image fallback payloads, secret containment, honest 502s with no key     |
+| `test/unit/fallback-ui.test.tsx`       | 15 tests: attribution badge, model picker labelling, composer vision hint, Image Studio model + tier chooser, Video Studio engine/mode picker, stop and resume watching                        |
+| `test/e2e/app-flow.test.tsx`           | the full journey through the real component tree (14 steps, upstream mocked at the network boundary)                                                                                           |
+| `e2e/bliss.spec.ts`                    | Playwright browser suite: desktop, iPhone 14, iPad portrait; overflow + drawer + persistence checks                                                                                            |
 
 External HTTP is always mocked, so the suite is deterministic and never hits the free provider.
 
@@ -311,7 +357,7 @@ vercel --prod
 Already deployed: project **bliss-ai** → `https://bliss-ai-iota.vercel.app` (production alias) and
 `https://bliss-ai-git-arena-b92fb736-bliss-obiorachibuikes-projects.vercel.app` (branch preview).
 Function timeouts are declared in `vercel.json` (`/api/video` 300s, `/api/image` 300s, `/api/chat` 90s — the chat
-budget covers the primary attempt *plus* one fallback attempt).
+budget covers the primary attempt _plus_ one fallback attempt).
 
 To enable the fallback on Vercel:
 

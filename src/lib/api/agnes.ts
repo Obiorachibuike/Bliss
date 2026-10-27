@@ -355,7 +355,8 @@ export type { AgnesVideoMode };
 export interface AgnesVideoRequest {
   model?: string;
   prompt: string;
-  mode: AgnesVideoMode;
+  /** Omitted = "text", the provider's own default. */
+  mode?: AgnesVideoMode;
   /** Seconds of output; documented range "4"–"12", default "5". */
   seconds?: number;
   size?: string;
@@ -392,6 +393,16 @@ export interface AgnesVideoStatusResult {
 
 const publicUrl = (value: string | undefined): value is string =>
   typeof value === "string" && isValidUrl(value.trim());
+
+/** A request Bliss refused on its own — the documented contract says the provider
+ *  answers these with HTTP 400, so there is no point spending a request (or quota). */
+export class AgnesRequestRejectedError extends Error {
+  readonly rejected = true;
+  constructor(message: string) {
+    super(message);
+    this.name = "AgnesRequestRejectedError";
+  }
+}
 
 /** Build the documented request body, throwing on anything the provider would 400 on. */
 export function buildAgnesVideoBody(
@@ -481,7 +492,10 @@ export function buildAgnesVideoBody(
   )
     body.seed = req.seed;
 
-  if (req.mode === "text") {
+  /* `mode` is optional upstream and defaults to "text"; anything else must be an
+   * explicit choice, so an omitted mode can never turn into a reference request. */
+  const mode = req.mode ?? "text";
+  if (mode === "text") {
     if (images.length || audios.length || firstFrame || lastFrame || videoUrl) {
       throw new Error(
         "Text mode takes a prompt only — remove the media references or switch mode.",
@@ -491,7 +505,7 @@ export function buildAgnesVideoBody(
     return body;
   }
 
-  if (req.mode === "keyframe") {
+  if (mode === "keyframe") {
     if (!firstFrame && !lastFrame)
       throw new Error(
         "Keyframe mode needs a first frame, a last frame, or both.",
@@ -549,7 +563,17 @@ export async function createAgnesVideo(
   if (!isAgnesConfigured()) throw new AgnesNotConfiguredError();
   if (!isAgnesVideoModel(req.model ?? AGNES_VIDEO_MODEL))
     throw new Error("Unknown Agnes video model.");
-  const body = buildAgnesVideoBody(req);
+  /* Anything the provider would answer with a 400 is rejected here, before a request
+   * leaves the server: no quota is spent, and the caller can tell "your input is
+   * invalid" apart from "the service is down". */
+  let body: Record<string, unknown>;
+  try {
+    body = buildAgnesVideoBody(req);
+  } catch (e: unknown) {
+    throw new AgnesRequestRejectedError(
+      e instanceof Error ? e.message : "That video request isn't valid.",
+    );
+  }
 
   let raw: RawCall;
   try {

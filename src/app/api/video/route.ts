@@ -128,6 +128,9 @@ export async function POST(req: Request) {
     const firstFrame = text(body.firstFrameUrl);
     const lastFrame = text(body.lastFrameUrl);
     const referenceVideoUrl = text(body.referenceVideoUrl);
+    /* `ratio` is the name Image Studio and the public docs use for the same idea, so
+     * both spellings are accepted — but only the documented Agnes values survive. */
+    const aspectRatio = text(body.aspectRatio) || text(body.ratio);
     const mode = resolveMode(
       text(body.mode),
       [...images, ...(referenceVideoUrl ? [referenceVideoUrl] : [])],
@@ -143,9 +146,7 @@ export async function POST(req: Request) {
         ? { seconds: Math.trunc(body.seconds) }
         : {}),
       ...(text(body.size) ? { size: text(body.size) } : {}),
-      ...(text(body.aspectRatio)
-        ? { aspectRatio: text(body.aspectRatio) }
-        : {}),
+      ...(aspectRatio ? { aspectRatio } : {}),
       ...(images.length ? { images } : {}),
       ...(audios.length ? { audios } : {}),
       ...(firstFrame ? { firstFrame } : {}),
@@ -175,7 +176,8 @@ export async function POST(req: Request) {
           model,
           fallbackUsed: false,
         },
-        { status: 502 },
+        // A rejected input is a client mistake; everything else is upstream trouble.
+        { status: job.rejected ? 400 : 502 },
       );
     }
 
@@ -259,6 +261,14 @@ export async function GET(req: Request) {
   if (!jobId) {
     return NextResponse.json(
       { error: "A video task id is required." },
+      { status: 400 },
+    );
+  }
+  /* Same shape the client accepts, checked here too so a malformed id is a 400 rather
+   * than a "successful" poll that reports a meaningless failure. */
+  if (!/^[A-Za-z0-9_.:-]{4,120}$/.test(jobId)) {
+    return NextResponse.json(
+      { error: "That video task id isn't valid." },
       { status: 400 },
     );
   }
