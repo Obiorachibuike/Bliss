@@ -416,6 +416,26 @@ describe("GET /api/health", () => {
     expect(fetchMock.mock.calls.length).toBe(probesAfterFirst); // served from cache, no new upstream calls
   });
 
+  it("refuses to call a partial outage operational", async () => {
+    vi.resetModules();
+    // chat answers, the image endpoint 503s — a user pressing Generate is blocked,
+    // so the summary must say so instead of leaning on "at least one is up".
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL) =>
+        String(input).includes("flux-dev")
+          ? new Response("down", { status: 503 })
+          : Response.json({ success: true, response: "pong" }),
+      ),
+    );
+    const { GET } = await import("@/app/api/health/route");
+    const body = await (await GET()).json();
+    expect(body.services.text.reachable).toBe(true);
+    expect(body.services.image.reachable).toBe(false);
+    expect(body.status).toBe("degraded");
+    expect(body.degraded).toEqual(["image generation"]);
+  });
+
   it("degrades honestly when the provider is down", async () => {
     vi.resetModules();
     vi.stubGlobal(
