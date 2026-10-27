@@ -297,8 +297,8 @@ export function ExploreModels({
                 </p>
                 <p className="mt-0.5 text-xs leading-relaxed text-[#94A3B8]">
                   {fallback.vision
-                    ? "Vision analysis, native multi-turn context and image editing run through the Agnes fallback. Text-to-video, function calling and streaming stay off: Bliss only wires up what each provider actually documents."
-                    : "Vision / image analysis, text-to-video, function calling and streaming are not documented at the CVRON free API, so Bliss doesn’t fake them. Native conversation context is unavailable too — Bliss builds a compact prompt digest from your last 6 messages. Set AGNES_API_KEY to lift the vision and multi-turn limits."}
+                    ? "With a key, this deployment also answers text-to-video, keyframe and reference video tasks through the Agnes provider. Streaming and function calling stay off in the UI: Bliss only wires up what each provider actually documents, and only where the app can show it honestly."
+                    : "On the key-less CVRON API, vision analysis, text-to-video, function calling and streaming aren’t documented, so Bliss doesn’t fake them. Video Studio is limited to WAN 2.2 image-to-video, and conversation context is built as a compact prompt digest from your last turns. Set AGNES_API_KEY to lift the vision, multi-turn and text-to-video limits."}
                 </p>
               </div>
               <code className="rounded-lg bg-white px-2 py-1 font-mono text-[10px] text-[#94A3B8] dark:bg-[#101827]">
