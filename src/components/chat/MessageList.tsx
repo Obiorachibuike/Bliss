@@ -1,6 +1,15 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { Copy, Check, RefreshCw, Pencil, Bookmark, User, Sparkles, AlertTriangle } from "lucide-react";
+import {
+  Copy,
+  Check,
+  RefreshCw,
+  Pencil,
+  Bookmark,
+  User,
+  Sparkles,
+  AlertTriangle,
+} from "lucide-react";
 import { ProviderBadge } from "./ProviderBadge";
 import type { ChatMessage } from "@/lib/types";
 import { MarkdownRenderer } from "./MarkdownRenderer";
@@ -43,22 +52,34 @@ function MessageActions({
 
   return (
     <div className="mt-1.5 flex items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-      <button onClick={copy} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-[#94A3B8] hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white">
+      <button
+        onClick={copy}
+        className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-[#94A3B8] hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"
+      >
         {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
         {copied ? "Copied" : "Copy"}
       </button>
       {isAssistant && onRegenerate && (
-        <button onClick={onRegenerate} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-[#94A3B8] hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white">
+        <button
+          onClick={onRegenerate}
+          className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-[#94A3B8] hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"
+        >
           <RefreshCw className="h-3 w-3" /> Regenerate
         </button>
       )}
       {isAssistant && (
-        <button onClick={save} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-[#94A3B8] hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white">
+        <button
+          onClick={save}
+          className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-[#94A3B8] hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"
+        >
           <Bookmark className="h-3 w-3" /> Save
         </button>
       )}
       {!isAssistant && onEdit && (
-        <button onClick={onEdit} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-[#94A3B8] hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white">
+        <button
+          onClick={onEdit}
+          className="flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-medium text-[#94A3B8] hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"
+        >
           <Pencil className="h-3 w-3" /> Edit
         </button>
       )}
@@ -96,7 +117,8 @@ export function MessageList({
   }, []);
 
   useEffect(() => {
-    if (stickRef.current) bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+    if (stickRef.current)
+      bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, streamingId]);
 
   return (
@@ -111,7 +133,7 @@ export function MessageList({
                 key={m.id}
                 className={cn(
                   "group animate-fade-up flex gap-3",
-                  isUser ? "flex-row-reverse" : "flex-row"
+                  isUser ? "flex-row-reverse" : "flex-row",
                 )}
               >
                 <div className="mt-0.5 shrink-0">
@@ -124,7 +146,12 @@ export function MessageList({
                   )}
                 </div>
 
-                <div className={cn("min-w-0 flex-1", isUser && "flex flex-col items-end")}>
+                <div
+                  className={cn(
+                    "min-w-0 flex-1",
+                    isUser && "flex flex-col items-end",
+                  )}
+                >
                   <div className="mb-1 flex items-center gap-2">
                     <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                       {isUser ? "You" : "Bliss"}
@@ -134,7 +161,9 @@ export function MessageList({
                         {m.modelId}
                       </span>
                     )}
-                    {!isUser && m.via === "agnes" && <ProviderBadge provider="agnes" model={m.modelId} />}
+                    {!isUser && m.via === "agnes" && (
+                      <ProviderBadge provider="agnes" model={m.modelId} />
+                    )}
                   </div>
 
                   {isUser ? (
@@ -163,7 +192,10 @@ export function MessageList({
                           >
                             Save & resend
                           </button>
-                          <button onClick={() => setEditing(null)} className="rounded-lg border px-3 py-1.5 text-xs">
+                          <button
+                            onClick={() => setEditing(null)}
+                            className="rounded-lg border px-3 py-1.5 text-xs"
+                          >
                             Cancel
                           </button>
                         </div>
@@ -183,7 +215,9 @@ export function MessageList({
                       ) : isStreamingThis ? (
                         <div className="flex items-center gap-2 rounded-2xl border border-[rgba(148,163,184,0.12)] bg-white px-4 py-3 dark:bg-[#101827]">
                           <Sparkles className="h-4 w-4 animate-pulse text-[#2563EB]" />
-                          <span className="text-sm text-[#94A3B8]">Thinking…</span>
+                          <span className="text-sm text-[#94A3B8]">
+                            Thinking…
+                          </span>
                           <span className="ml-1 flex gap-1">
                             <span className="typing-dot" />
                             <span className="typing-dot" />
@@ -200,8 +234,17 @@ export function MessageList({
                     <MessageActions
                       msg={m}
                       isAssistant={!isUser}
-                      onRegenerate={!isUser ? () => onRegenerate?.(m.id) : undefined}
-                      onEdit={isUser ? () => { setEditing(m.id); setDraft(m.content); } : undefined}
+                      onRegenerate={
+                        !isUser ? () => onRegenerate?.(m.id) : undefined
+                      }
+                      onEdit={
+                        isUser
+                          ? () => {
+                              setEditing(m.id);
+                              setDraft(m.content);
+                            }
+                          : undefined
+                      }
                     />
                   )}
                 </div>

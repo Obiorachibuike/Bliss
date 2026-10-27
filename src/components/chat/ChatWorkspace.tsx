@@ -1,6 +1,14 @@
 "use client";
 import { useCallback, useRef, useState } from "react";
-import { Menu, Plus, PanelRightOpen, PanelRightClose, WifiOff, X, RefreshCw } from "lucide-react";
+import {
+  Menu,
+  Plus,
+  PanelRightOpen,
+  PanelRightClose,
+  WifiOff,
+  X,
+  RefreshCw,
+} from "lucide-react";
 import { useChatStore, uid } from "@/lib/store/chatStore";
 import { useSettingsStore } from "@/lib/store/settingsStore";
 import { Composer } from "./Composer";
@@ -19,7 +27,9 @@ export function ChatWorkspace({
   onOpenMobileNav: () => void;
   onGoToImageStudio: (prompt: string) => void;
 }) {
-  const active = useChatStore((s) => s.conversations.find((c) => c.id === s.activeId));
+  const active = useChatStore((s) =>
+    s.conversations.find((c) => c.id === s.activeId),
+  );
   const createConversation = useChatStore((s) => s.createConversation);
   const addMessage = useChatStore((s) => s.addMessage);
   const updateMessage = useChatStore((s) => s.updateMessage);
@@ -42,9 +52,20 @@ export function ChatWorkspace({
   const abortRef = useRef<AbortController | null>(null);
 
   const requestAssistant = useCallback(
-    async (convId: string, prompt: string, history: { role: string; content: string }[], modelId: ModelId) => {
+    async (
+      convId: string,
+      prompt: string,
+      history: { role: string; content: string }[],
+      modelId: ModelId,
+    ) => {
       const asstId = uid();
-      addMessage(convId, { id: asstId, role: "assistant", content: "", timestamp: Date.now(), modelId });
+      addMessage(convId, {
+        id: asstId,
+        role: "assistant",
+        content: "",
+        timestamp: Date.now(),
+        modelId,
+      });
       setPendingId(asstId);
       setServiceWarning(null);
 
@@ -67,7 +88,12 @@ export function ChatWorkspace({
           return;
         }
 
-        if (!res.ok || !data?.success || typeof data.response !== "string" || !data.response.trim()) {
+        if (
+          !res.ok ||
+          !data?.success ||
+          typeof data.response !== "string" ||
+          !data.response.trim()
+        ) {
           const msg =
             data?.error ??
             (res.status === 429
@@ -99,7 +125,7 @@ export function ChatWorkspace({
         setPendingId(null);
       }
     },
-    [addMessage, updateMessage, removeMessage]
+    [addMessage, updateMessage, removeMessage],
   );
 
   const sendMessage = useCallback(
@@ -107,31 +133,48 @@ export function ChatWorkspace({
       let convId = active?.id;
       if (!convId) convId = createConversation(model, text);
 
-      const prior = useChatStore.getState().conversations.find((c) => c.id === convId);
+      const prior = useChatStore
+        .getState()
+        .conversations.find((c) => c.id === convId);
       const history = (prior?.messages ?? [])
         .filter((m) => !m.error && m.content.trim())
         .map((m) => ({ role: m.role, content: m.content }));
 
-      addMessage(convId, { id: uid(), role: "user", content: text, timestamp: Date.now() });
+      addMessage(convId, {
+        id: uid(),
+        role: "user",
+        content: text,
+        timestamp: Date.now(),
+      });
       await requestAssistant(convId, text, history, model);
     },
-    [active?.id, createConversation, addMessage, model, requestAssistant]
+    [active?.id, createConversation, addMessage, model, requestAssistant],
   );
 
   const regenerate = useCallback(
     async (asstMsgId: string) => {
       if (!active) return;
       const idx = active.messages.findIndex((m) => m.id === asstMsgId);
-      const userMsg = [...active.messages.slice(0, idx)].reverse().find((m) => m.role === "user");
+      const userMsg = [...active.messages.slice(0, idx)]
+        .reverse()
+        .find((m) => m.role === "user");
       if (!userMsg) return;
       removeMessage(active.id, asstMsgId);
       const history = active.messages
-        .slice(0, active.messages.findIndex((m) => m.id === userMsg.id))
+        .slice(
+          0,
+          active.messages.findIndex((m) => m.id === userMsg.id),
+        )
         .filter((m) => !m.error && m.content.trim())
         .map((m) => ({ role: m.role, content: m.content }));
-      await requestAssistant(active.id, userMsg.content, history, active.modelId);
+      await requestAssistant(
+        active.id,
+        userMsg.content,
+        history,
+        active.modelId,
+      );
     },
-    [active, removeMessage, requestAssistant]
+    [active, removeMessage, requestAssistant],
   );
 
   const editMessage = useCallback(
@@ -140,12 +183,15 @@ export function ChatWorkspace({
       updateMessage(active.id, msgId, { content, timestamp: Date.now() });
       truncateAfter(active.id, msgId);
       const history = active.messages
-        .slice(0, active.messages.findIndex((m) => m.id === msgId))
+        .slice(
+          0,
+          active.messages.findIndex((m) => m.id === msgId),
+        )
         .filter((m) => !m.error && m.content.trim())
         .map((m) => ({ role: m.role, content: m.content }));
       await requestAssistant(active.id, content, history, active.modelId);
     },
-    [active, updateMessage, truncateAfter, requestAssistant]
+    [active, updateMessage, truncateAfter, requestAssistant],
   );
 
   const stop = () => abortRef.current?.abort();
@@ -164,9 +210,13 @@ export function ChatWorkspace({
           </button>
 
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold">{active?.title ?? "New conversation"}</p>
+            <p className="truncate text-sm font-semibold">
+              {active?.title ?? "New conversation"}
+            </p>
             <p className="hidden truncate text-[11px] text-[#94A3B8] sm:block">
-              {active ? `${active.messages.length} messages · ${modelName}` : `Ready · ${modelName}`}
+              {active
+                ? `${active.messages.length} messages · ${modelName}`
+                : `Ready · ${modelName}`}
             </p>
           </div>
 
@@ -182,11 +232,15 @@ export function ChatWorkspace({
               onClick={() => setContextPanel(!showPanel)}
               className={cn(
                 "hidden h-9 w-9 place-items-center rounded-xl border border-[rgba(148,163,184,0.16)] hover:bg-slate-50 dark:hover:bg-white/5 xl:grid",
-                showPanel && "bg-[#EFF6FF] dark:bg-[#2563EB]/15"
+                showPanel && "bg-[#EFF6FF] dark:bg-[#2563EB]/15",
               )}
               aria-label="Toggle context panel"
             >
-              {showPanel ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+              {showPanel ? (
+                <PanelRightClose className="h-4 w-4" />
+              ) : (
+                <PanelRightOpen className="h-4 w-4" />
+              )}
             </button>
           </div>
         </header>
@@ -203,7 +257,9 @@ export function ChatWorkspace({
             {active && (
               <button
                 onClick={() => {
-                  const last = [...active.messages].reverse().find((m) => m.role === "user");
+                  const last = [...active.messages]
+                    .reverse()
+                    .find((m) => m.role === "user");
                   if (last) regenerate(asstErrorId(active, last));
                 }}
                 className="flex items-center gap-1 rounded-md px-1.5 py-0.5 font-semibold hover:bg-black/5 dark:hover:bg-white/10"
@@ -261,7 +317,10 @@ export function ChatWorkspace({
   );
 }
 
-function asstErrorId(conv: { messages: ChatMessage[] }, lastUser: ChatMessage): string {
+function asstErrorId(
+  conv: { messages: ChatMessage[] },
+  lastUser: ChatMessage,
+): string {
   const idx = conv.messages.findIndex((m) => m.id === lastUser.id);
   const next = conv.messages.slice(idx + 1).find((m) => m.role === "assistant");
   return next?.id ?? lastUser.id;

@@ -9,17 +9,22 @@ export interface Toast {
 }
 
 let n = 0;
-const useToastStore = create<{ toasts: Toast[]; push: (m: string, k: ToastKind) => void; remove: (id: number) => void }>(
-  (set) => ({
-    toasts: [],
-    push: (message, kind) => {
-      const id = ++n;
-      set((s) => ({ toasts: [...s.toasts, { id, message, kind }] }));
-      setTimeout(() => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })), 4200);
-    },
-    remove: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
-  })
-);
+const useToastStore = create<{
+  toasts: Toast[];
+  push: (m: string, k: ToastKind) => void;
+  remove: (id: number) => void;
+}>((set) => ({
+  toasts: [],
+  push: (message, kind) => {
+    const id = ++n;
+    set((s) => ({ toasts: [...s.toasts, { id, message, kind }] }));
+    setTimeout(
+      () => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+      4200,
+    );
+  },
+  remove: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
+}));
 
 export const toast = {
   success: (m: string) => useToastStore.getState().push(m, "success"),
@@ -43,11 +48,13 @@ export function Toaster() {
               (t.kind === "success"
                 ? "bg-[#22C55E]"
                 : t.kind === "error"
-                ? "bg-[#EF4444]"
-                : "bg-[#3B82F6]")
+                  ? "bg-[#EF4444]"
+                  : "bg-[#3B82F6]")
             }
           />
-          <p className="flex-1 text-slate-700 dark:text-slate-200">{t.message}</p>
+          <p className="flex-1 text-slate-700 dark:text-slate-200">
+            {t.message}
+          </p>
           <button
             onClick={() => remove(t.id)}
             className="text-xs text-[#94A3B8] hover:text-slate-700 dark:hover:text-white"

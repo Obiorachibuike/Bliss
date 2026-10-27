@@ -3,8 +3,13 @@ export type ModelId =
   | "gpt-5-nano"
   | "gemini-2.5-flash-lite"
   | "deepseek-v3.2"
-  /** Direct fallback-provider model: routed to Agnes AI, never through CVRON. */
-  | "agnes-2.5-flash";
+  /** Fallback-provider models: routed to Agnes AI, never through CVRON. These are
+   *  the documented, generally available chat ids (agnes-2.0-flash is deprecated
+   *  upstream and agnes-3.0-pro is "coming soon", so neither is offered). */
+  | "agnes-2.5-flash"
+  | "agnes-3.0-flash"
+  | "agnes-2.5-pro-beta"
+  | "agnes-2.5-pro";
 
 /** Which provider actually answered a generation. */
 export type ProviderId = "cvron" | "agnes" | "unknown";
@@ -14,13 +19,15 @@ export interface AIModel {
   name: string;
   provider: string;
   description: string;
-  capabilities: string[];
+  capabilities: readonly string[];
   endpoint: string;
   color: string;
   icon: string;
   available: boolean;
   /** True when the model is served by the optional Agnes fallback provider. */
   fallback?: boolean;
+  /** True when the provider bills published per-token rates for this model. */
+  billed?: boolean;
 }
 
 export interface ChatMessage {

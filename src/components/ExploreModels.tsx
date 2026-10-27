@@ -1,7 +1,23 @@
 "use client";
 import { useMemo, useState } from "react";
-import { Search, Check, Sparkles, Image as ImageIcon, Film, Menu, EyeOff, ArrowRight, ShieldCheck } from "lucide-react";
-import { MODELS_WITH_FALLBACK, IMAGE_MODELS_WITH_FALLBACK, VIDEO_MODELS, ENDPOINTS, API_LIMITATIONS } from "@/lib/api/config";
+import {
+  Search,
+  Check,
+  Sparkles,
+  Image as ImageIcon,
+  Film,
+  Menu,
+  EyeOff,
+  ArrowRight,
+  ShieldCheck,
+} from "lucide-react";
+import {
+  MODELS_WITH_FALLBACK,
+  IMAGE_MODELS_WITH_FALLBACK,
+  VIDEO_MODELS_WITH_FALLBACK,
+  ENDPOINTS,
+  API_LIMITATIONS,
+} from "@/lib/api/config";
 import { useFallbackStatus } from "@/lib/hooks/useModelCatalog";
 import { useSettingsStore } from "@/lib/store/settingsStore";
 import { Badge } from "@/components/ui/badge";
@@ -15,6 +31,7 @@ const GROUPS = [
   { id: "reasoning", label: "Reasoning" },
   { id: "coding", label: "Coding" },
   { id: "image", label: "Image generation" },
+  { id: "video", label: "Video" },
   { id: "vision", label: "Vision" },
   { id: "fallback", label: "Fallback provider" },
 ];
@@ -52,10 +69,10 @@ export function ExploreModels({
             c.toLowerCase().includes("code")
               ? "coding"
               : c.toLowerCase().includes("vision")
-              ? "vision"
-              : c.toLowerCase().includes("reason")
-              ? "reasoning"
-              : "general"
+                ? "vision"
+                : c.toLowerCase().includes("reason")
+                  ? "reasoning"
+                  : "general",
           ),
           ...(m.fallback ? ["fallback"] : []),
         ] as string[],
@@ -73,7 +90,7 @@ export function ExploreModels({
         fallback: !!m.fallback,
         groups: ["image", ...(m.fallback ? ["fallback"] : [])] as string[],
       })),
-      ...VIDEO_MODELS.map((m) => ({
+      ...VIDEO_MODELS_WITH_FALLBACK.map((m) => ({
         id: m.id,
         name: m.name,
         provider: m.provider,
@@ -83,8 +100,14 @@ export function ExploreModels({
         kind: "video" as const,
         icon: "🎬",
         available: m.available,
-        fallback: false,
-        groups: ["image"],
+        fallback: !!m.fallback,
+        groups: [
+          "image",
+          ...(m.capabilities.some((c: string) => /video|keyframe/i.test(c))
+            ? ["video"]
+            : []),
+          ...(m.fallback ? ["fallback"] : []),
+        ] as string[],
       })),
     ];
     return all.filter((m) => {
@@ -101,7 +124,11 @@ export function ExploreModels({
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       <header className="glass sticky top-0 z-30 flex h-14 shrink-0 items-center gap-3 border-b border-[rgba(148,163,184,0.12)] px-3 sm:px-5">
-        <button onClick={onOpenMobileNav} className="grid h-9 w-9 place-items-center rounded-xl hover:bg-black/5 dark:hover:bg-white/10 lg:hidden" aria-label="Open navigation">
+        <button
+          onClick={onOpenMobileNav}
+          className="grid h-9 w-9 place-items-center rounded-xl hover:bg-black/5 dark:hover:bg-white/10 lg:hidden"
+          aria-label="Open navigation"
+        >
           <Menu className="h-5 w-5" />
         </button>
         <div className="flex-1">
@@ -109,7 +136,10 @@ export function ExploreModels({
             <Sparkles className="h-4 w-4 text-[#2563EB]" /> Explore Models
           </h1>
           <p className="hidden text-[11px] text-[#94A3B8] sm:block">
-            Verified against FreeAiAPIs{fallback.enabled ? " + the Agnes AI fallback" : " (fallback provider not configured)"}
+            Verified against FreeAiAPIs
+            {fallback.enabled
+              ? " + the Agnes AI fallback"
+              : " (fallback provider not configured)"}
           </p>
         </div>
       </header>
@@ -127,7 +157,9 @@ export function ExploreModels({
           </div>
 
           <div className="flex flex-wrap gap-1.5">
-            <Chip active={group === "all"} onClick={() => setGroup("all")}>All</Chip>
+            <Chip active={group === "all"} onClick={() => setGroup("all")}>
+              All
+            </Chip>
             {GROUPS.map((g) => (
               <Chip
                 key={g.id}
@@ -146,14 +178,22 @@ export function ExploreModels({
 
           <div className="grid gap-3 sm:grid-cols-2">
             {cards.map((m, i) => (
-              <Card key={`${m.kind}-${m.id}`} className="animate-fade-up group relative overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_44px_-20px_rgba(37,99,235,0.5)]" style={{ animationDelay: `${i * 50}ms` }}>
+              <Card
+                key={`${m.kind}-${m.id}`}
+                className="animate-fade-up group relative overflow-hidden transition-all hover:-translate-y-0.5 hover:shadow-[0_18px_44px_-20px_rgba(37,99,235,0.5)]"
+                style={{ animationDelay: `${i * 50}ms` }}
+              >
                 <div className="absolute -right-10 -top-10 h-28 w-28 rounded-full bg-[radial-gradient(circle,rgba(59,130,246,0.14),transparent_70%)]" />
                 <CardContent className="relative space-y-3">
                   <div className="flex items-start gap-3">
-                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#EFF6FF] text-lg dark:bg-[#2563EB]/15">{m.icon}</div>
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#EFF6FF] text-lg dark:bg-[#2563EB]/15">
+                      {m.icon}
+                    </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="truncate text-sm font-semibold">{m.name}</p>
+                        <p className="truncate text-sm font-semibold">
+                          {m.name}
+                        </p>
                         {m.kind === "text" && defaultModel === m.id && (
                           <span className="flex items-center gap-1 rounded-full bg-[#22C55E]/10 px-1.5 py-0.5 text-[10px] font-semibold text-[#16A34A]">
                             <Check className="h-2.5 w-2.5" /> Default
@@ -165,37 +205,66 @@ export function ExploreModels({
                     <div className="flex shrink-0 flex-col items-end gap-1">
                       <Badge className="shrink-0">{m.kind}</Badge>
                       {m.fallback && (
-                        <span className={cn("flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium", "border border-[#2563EB]/25 bg-[#EFF6FF] text-[#2563EB] dark:bg-[#2563EB]/15 dark:text-[#60A5FA]")}>
+                        <span
+                          className={cn(
+                            "flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium",
+                            "border border-[#2563EB]/25 bg-[#EFF6FF] text-[#2563EB] dark:bg-[#2563EB]/15 dark:text-[#60A5FA]",
+                          )}
+                        >
                           <ShieldCheck className="h-2.5 w-2.5" /> fallback
                         </span>
                       )}
                     </div>
                   </div>
 
-                  <p className="line-clamp-2 text-xs leading-relaxed text-[#94A3B8]">{m.description}</p>
+                  <p className="line-clamp-2 text-xs leading-relaxed text-[#94A3B8]">
+                    {m.description}
+                  </p>
 
                   <div className="flex flex-wrap gap-1.5">
                     {m.capabilities.map((c) => (
-                      <span key={c} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-white/10 dark:text-slate-300">{c}</span>
+                      <span
+                        key={c}
+                        className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:bg-white/10 dark:text-slate-300"
+                      >
+                        {c}
+                      </span>
                     ))}
                   </div>
 
-                  <code className="block truncate rounded-lg bg-slate-50 px-2 py-1.5 font-mono text-[10px] text-[#94A3B8] dark:bg-white/5">{m.endpoint.replace("https://", "")}</code>
+                  <code className="block truncate rounded-lg bg-slate-50 px-2 py-1.5 font-mono text-[10px] text-[#94A3B8] dark:bg-white/5">
+                    {m.endpoint.replace("https://", "")}
+                  </code>
 
                   {m.fallback && !fallback.enabled && (
                     <p className="rounded-lg border border-[#F59E0B]/25 bg-[#F59E0B]/10 px-2 py-1.5 text-[10px] leading-relaxed text-amber-700 dark:text-amber-300">
-                      Selecting this model returns a clear &ldquo;not enabled&rdquo; error until a server-side
-                      AGNES_API_KEY is configured — Bliss never reroutes it to the key-less provider.
+                      Selecting this model returns a clear &ldquo;not
+                      enabled&rdquo; error until a server-side AGNES_API_KEY is
+                      configured — Bliss never reroutes it to the key-less
+                      provider.
                     </p>
                   )}
 
                   <div className="flex items-center gap-2 pt-1">
                     {m.kind === "text" && (
                       <>
-                        <Button size="sm" onClick={() => { setDefaultModel(m.id as never); onUseChat(); toast.success(`${m.name} is now your default model`); }}>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setDefaultModel(m.id as never);
+                            onUseChat();
+                            toast.success(
+                              `${m.name} is now your default model`,
+                            );
+                          }}
+                        >
                           Use in chat
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => onUseChat()}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => onUseChat()}
+                        >
                           Try <ArrowRight className="h-3 w-3" />
                         </Button>
                       </>
@@ -223,7 +292,9 @@ export function ExploreModels({
                 <EyeOff className="h-5 w-5" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-semibold">Not supported by this provider</p>
+                <p className="text-sm font-semibold">
+                  Not supported by this provider
+                </p>
                 <p className="mt-0.5 text-xs leading-relaxed text-[#94A3B8]">
                   {fallback.vision
                     ? "Vision analysis, native multi-turn context and image editing run through the Agnes fallback. Text-to-video, function calling and streaming stay off: Bliss only wires up what each provider actually documents."
@@ -241,7 +312,19 @@ export function ExploreModels({
   );
 }
 
-function Chip({ children, active, onClick, disabled, title }: { children: React.ReactNode; active?: boolean; onClick?: () => void; disabled?: boolean; title?: string }) {
+function Chip({
+  children,
+  active,
+  onClick,
+  disabled,
+  title,
+}: {
+  children: React.ReactNode;
+  active?: boolean;
+  onClick?: () => void;
+  disabled?: boolean;
+  title?: string;
+}) {
   return (
     <button
       onClick={onClick}
@@ -249,9 +332,13 @@ function Chip({ children, active, onClick, disabled, title }: { children: React.
       className={cn(
         "rounded-full border px-3 py-1.5 text-xs font-medium transition",
         disabled && "cursor-not-allowed opacity-40",
-        active ? "border-transparent brand-gradient text-white shadow-sm" : "hover:bg-slate-50 dark:hover:bg-white/5"
+        active
+          ? "border-transparent brand-gradient text-white shadow-sm"
+          : "hover:bg-slate-50 dark:hover:bg-white/5",
       )}
-      title={title ?? (disabled ? "No verified vision endpoint exists" : undefined)}
+      title={
+        title ?? (disabled ? "No verified vision endpoint exists" : undefined)
+      }
     >
       {children}
     </button>

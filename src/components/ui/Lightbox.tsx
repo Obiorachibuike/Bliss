@@ -36,7 +36,10 @@ export function Lightbox({
       aria-modal="true"
       aria-label="Media preview"
     >
-      <div className="relative max-h-[90vh] w-full max-w-4xl" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="relative max-h-[90vh] w-full max-w-4xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="mb-3 flex items-center justify-between gap-3">
           <p className="line-clamp-1 text-sm text-white/80">{caption}</p>
           <div className="flex items-center gap-2">
@@ -49,7 +52,12 @@ export function Lightbox({
             >
               <Link2 className="h-3.5 w-3.5" /> Copy URL
             </Button>
-            <a href={src} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+            <a
+              href={src}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+            >
               <Button size="sm" variant="outline">
                 <Download className="h-3.5 w-3.5" /> Open
               </Button>
@@ -65,10 +73,19 @@ export function Lightbox({
         </div>
         <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/40">
           {kind === "video" ? (
-            <video src={src} controls autoPlay className="max-h-[76vh] w-full" />
+            <video
+              src={src}
+              controls
+              autoPlay
+              className="max-h-[76vh] w-full"
+            />
           ) : (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={src} alt={caption || "Preview"} className="max-h-[76vh] w-full object-contain" />
+            <img
+              src={src}
+              alt={caption || "Preview"}
+              className="max-h-[76vh] w-full object-contain"
+            />
           )}
         </div>
       </div>

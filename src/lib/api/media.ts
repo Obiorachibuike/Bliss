@@ -12,7 +12,9 @@ async function readUpstreamJson(res: Response): Promise<unknown> {
   const text = (await res.text()).trim();
   if (!text) throw new Error("The media service returned an empty response.");
   if (text.startsWith("<")) {
-    throw new Error("The media service returned an HTML error page instead of JSON. It may be busy — please retry.");
+    throw new Error(
+      "The media service returned an HTML error page instead of JSON. It may be busy — please retry.",
+    );
   }
   try {
     return JSON.parse(text);
@@ -21,11 +23,17 @@ async function readUpstreamJson(res: Response): Promise<unknown> {
   }
 }
 
-function parseMediaPayload(payload: unknown, keys: string[], kind: string): string {
+function parseMediaPayload(
+  payload: unknown,
+  keys: string[],
+  kind: string,
+): string {
   if (typeof payload === "string") {
     const s = payload.trim();
     if (isValidUrl(s)) return s;
-    throw new Error(`The ${kind} service returned plain text without a media URL.`);
+    throw new Error(
+      `The ${kind} service returned plain text without a media URL.`,
+    );
   }
   if (!payload || typeof payload !== "object") {
     throw new Error(`The ${kind} service returned an unexpected response.`);
@@ -33,7 +41,10 @@ function parseMediaPayload(payload: unknown, keys: string[], kind: string): stri
 
   const obj = payload as Record<string, unknown>;
   if (obj.success === false) {
-    const message = typeof obj.message === "string" ? obj.message : `The ${kind} service reported a failure.`;
+    const message =
+      typeof obj.message === "string"
+        ? obj.message
+        : `The ${kind} service reported a failure.`;
     throw new Error(message);
   }
 
@@ -57,21 +68,40 @@ function parseMediaPayload(payload: unknown, keys: string[], kind: string): stri
     }
   }
 
-  throw new Error(`The ${kind} service did not return a usable URL — generation likely failed upstream.`);
+  throw new Error(
+    `The ${kind} service did not return a usable URL — generation likely failed upstream.`,
+  );
 }
 
-async function callMediaService(url: string, keys: string[], kind: string, timeoutMs: number): Promise<string> {
+async function callMediaService(
+  url: string,
+  keys: string[],
+  kind: string,
+  timeoutMs: number,
+): Promise<string> {
   let res: Response;
   try {
-    res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(timeoutMs) });
+    res = await fetch(url, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(timeoutMs),
+    });
   } catch (e: unknown) {
-    if (e instanceof Error && (e.name === "TimeoutError" || e.name === "AbortError")) {
-      throw new Error(`The ${kind} service took too long to respond. Please try again.`);
+    if (
+      e instanceof Error &&
+      (e.name === "TimeoutError" || e.name === "AbortError")
+    ) {
+      throw new Error(
+        `The ${kind} service took too long to respond. Please try again.`,
+      );
     }
-    throw new Error(`Bliss couldn't reach the ${kind} service. Please try again.`);
+    throw new Error(
+      `Bliss couldn't reach the ${kind} service. Please try again.`,
+    );
   }
   if (!res.ok) {
-    throw new Error(`The ${kind} service is unavailable right now (HTTP ${res.status}).`);
+    throw new Error(
+      `The ${kind} service is unavailable right now (HTTP ${res.status}).`,
+    );
   }
   return parseMediaPayload(await readUpstreamJson(res), keys, kind);
 }
@@ -83,20 +113,30 @@ export interface ImageResult {
 export async function generateImage(prompt: string): Promise<ImageResult> {
   const trimmed = prompt.trim();
   if (!trimmed) throw new Error("Describe the image you want to create.");
-  if (trimmed.length > 1000) throw new Error("Image prompts are limited to 1000 characters.");
+  if (trimmed.length > 1000)
+    throw new Error("Image prompts are limited to 1000 characters.");
   const url = `${ENDPOINTS.image.fluxDev}?prompt=${encodeURIComponent(trimmed)}`;
-  return { imageUrl: await callMediaService(url, IMAGE_KEYS, "image", 120_000) };
+  return {
+    imageUrl: await callMediaService(url, IMAGE_KEYS, "image", 120_000),
+  };
 }
 
-export async function editImage(prompt: string, imageUrl: string): Promise<ImageResult> {
+export async function editImage(
+  prompt: string,
+  imageUrl: string,
+): Promise<ImageResult> {
   const trimmed = prompt.trim();
   if (!trimmed) throw new Error("Describe how the image should change.");
   if (!isValidUrl(imageUrl)) {
-    throw new Error("The source image must be a valid http(s) URL that the provider can fetch publicly.");
+    throw new Error(
+      "The source image must be a valid http(s) URL that the provider can fetch publicly.",
+    );
   }
   const params = new URLSearchParams({ prompt: trimmed, image_url: imageUrl });
   const url = `${ENDPOINTS.image.image2image}?${params.toString()}`;
-  return { imageUrl: await callMediaService(url, IMAGE_KEYS, "image editing", 180_000) };
+  return {
+    imageUrl: await callMediaService(url, IMAGE_KEYS, "image editing", 180_000),
+  };
 }
 
 export interface VideoResult {
@@ -108,29 +148,45 @@ export interface VideoResult {
  * provider documents no job id, polling endpoint or callback, so there is nothing
  * to poll and no partial progress to report.
  */
-export async function generateVideo(prompt: string, imageUrl: string): Promise<VideoResult> {
+export async function generateVideo(
+  prompt: string,
+  imageUrl: string,
+): Promise<VideoResult> {
   const trimmed = prompt.trim();
   if (!trimmed) throw new Error("Describe the motion you want in the video.");
   if (!isValidUrl(imageUrl)) {
-    throw new Error("A valid, publicly accessible source image URL is required.");
+    throw new Error(
+      "A valid, publicly accessible source image URL is required.",
+    );
   }
   const params = new URLSearchParams({ prompt: trimmed, image: imageUrl });
   const url = `${ENDPOINTS.video.wan22}?${params.toString()}`;
-  return { videoUrl: await callMediaService(url, VIDEO_KEYS, "video", 280_000) };
+  return {
+    videoUrl: await callMediaService(url, VIDEO_KEYS, "video", 280_000),
+  };
 }
 
 /** FileBin host (GET up.php?url=IMAGE_URL). The response shape is undocumented, so the
  *  parsed value is validated before it is ever handed to another endpoint. */
 export async function hostImage(imageUrl: string): Promise<string> {
-  if (!isValidUrl(imageUrl)) throw new Error("Provide a valid image URL to host.");
+  if (!isValidUrl(imageUrl))
+    throw new Error("Provide a valid image URL to host.");
   const url = `${ENDPOINTS.image.up}?url=${encodeURIComponent(imageUrl)}`;
   let res: Response;
   try {
-    res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(90_000) });
+    res = await fetch(url, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(90_000),
+    });
   } catch {
-    throw new Error("Bliss couldn't reach the image host. Paste a public URL instead.");
+    throw new Error(
+      "Bliss couldn't reach the image host. Paste a public URL instead.",
+    );
   }
-  if (!res.ok) throw new Error(`The image host is unavailable right now (HTTP ${res.status}).`);
+  if (!res.ok)
+    throw new Error(
+      `The image host is unavailable right now (HTTP ${res.status}).`,
+    );
   const text = (await res.text()).trim();
   if (isValidUrl(text)) return text;
   try {

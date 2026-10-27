@@ -1,7 +1,16 @@
 "use client";
 import { useState } from "react";
 import { cn } from "@/lib/utils/cn";
-import { Search, Check, ChevronDown, Zap, Brain, Code2, Eye, ShieldCheck } from "lucide-react";
+import {
+  Search,
+  Check,
+  ChevronDown,
+  Zap,
+  Brain,
+  Code2,
+  Eye,
+  ShieldCheck,
+} from "lucide-react";
 import type { ModelId } from "@/lib/types";
 import { useFallbackStatus, useTextModels } from "@/lib/hooks/useModelCatalog";
 
@@ -20,13 +29,16 @@ export function ModelSelector({
   const filtered = MODELS.filter(
     (m) =>
       m.name.toLowerCase().includes(q.toLowerCase()) ||
-      m.provider.toLowerCase().includes(q.toLowerCase())
+      m.provider.toLowerCase().includes(q.toLowerCase()),
   );
 
   const capIcon = (cap: string) => {
-    if (cap.toLowerCase().includes("code")) return <Code2 className="w-3 h-3" />;
-    if (cap.toLowerCase().includes("reason")) return <Brain className="w-3 h-3" />;
-    if (cap.toLowerCase().includes("vision")) return <Eye className="w-3 h-3" />;
+    if (cap.toLowerCase().includes("code"))
+      return <Code2 className="w-3 h-3" />;
+    if (cap.toLowerCase().includes("reason"))
+      return <Brain className="w-3 h-3" />;
+    if (cap.toLowerCase().includes("vision"))
+      return <Eye className="w-3 h-3" />;
     return <Zap className="w-3 h-3" />;
   };
 
@@ -38,8 +50,15 @@ export function ModelSelector({
       >
         <span className="text-base leading-none">{selected.icon}</span>
         <span className="flex-1 text-left truncate">{selected.name}</span>
-        <span className="hidden sm:inline text-xs text-[#94A3B8]">{selected.provider}</span>
-        <ChevronDown className={cn("w-4 h-4 text-[#94A3B8] transition", open && "rotate-180")} />
+        <span className="hidden sm:inline text-xs text-[#94A3B8]">
+          {selected.provider}
+        </span>
+        <ChevronDown
+          className={cn(
+            "w-4 h-4 text-[#94A3B8] transition",
+            open && "rotate-180",
+          )}
+        />
       </button>
 
       {open && (
@@ -58,7 +77,10 @@ export function ModelSelector({
                 />
               </div>
               <p className="text-xs text-[#94A3B8] mt-2">
-                {MODELS.length} verified models • {fallback.enabled ? "fallback provider active" : "no API key needed"}
+                {MODELS.length} verified models •{" "}
+                {fallback.enabled
+                  ? "fallback provider active"
+                  : "no API key needed"}
               </p>
             </div>
 
@@ -74,27 +96,56 @@ export function ModelSelector({
                     "w-full flex gap-3 p-3 rounded-xl text-left transition border",
                     value === m.id
                       ? "bg-[linear-gradient(135deg,#2563EB_0%,#3B82F6_45%,#60A5FA_100%)] text-white border-transparent shadow-md"
-                      : "hover:bg-slate-50 dark:hover:bg-white/5 border-transparent"
+                      : "hover:bg-slate-50 dark:hover:bg-white/5 border-transparent",
                   )}
                 >
                   <span className="text-xl">{m.icon}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-sm">{m.name}</span>
-                      <span className={cn("text-xs px-1.5 py-0.5 rounded-full font-medium", value === m.id ? "bg-white/20 text-white" : "bg-slate-100 dark:bg-white/10 text-slate-500")}>
+                      <span
+                        className={cn(
+                          "text-xs px-1.5 py-0.5 rounded-full font-medium",
+                          value === m.id
+                            ? "bg-white/20 text-white"
+                            : "bg-slate-100 dark:bg-white/10 text-slate-500",
+                        )}
+                      >
                         {m.provider}
                       </span>
                       {m.fallback && (
-                        <span className={cn("flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium", value === m.id ? "bg-white/20 text-white" : "bg-[#22C55E]/10 text-[#16A34A] dark:text-[#4ADE80]")}>
+                        <span
+                          className={cn(
+                            "flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full font-medium",
+                            value === m.id
+                              ? "bg-white/20 text-white"
+                              : "bg-[#22C55E]/10 text-[#16A34A] dark:text-[#4ADE80]",
+                          )}
+                        >
                           <ShieldCheck className="h-2.5 w-2.5" /> fallback
                         </span>
                       )}
                       {value === m.id && <Check className="w-4 h-4 ml-auto" />}
                     </div>
-                    <p className={cn("text-xs mt-0.5 line-clamp-1", value === m.id ? "text-white/80" : "text-[#94A3B8]")}>{m.description}</p>
+                    <p
+                      className={cn(
+                        "text-xs mt-0.5 line-clamp-1",
+                        value === m.id ? "text-white/80" : "text-[#94A3B8]",
+                      )}
+                    >
+                      {m.description}
+                    </p>
                     <div className="flex gap-1.5 mt-1.5 flex-wrap">
                       {m.capabilities.map((c) => (
-                        <span key={c} className={cn("inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium", value === m.id ? "bg-white/20 text-white" : "bg-[#EFF6FF] dark:bg-[#2563EB]/20 text-[#2563EB] dark:text-[#60A5FA]")}>
+                        <span
+                          key={c}
+                          className={cn(
+                            "inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full font-medium",
+                            value === m.id
+                              ? "bg-white/20 text-white"
+                              : "bg-[#EFF6FF] dark:bg-[#2563EB]/20 text-[#2563EB] dark:text-[#60A5FA]",
+                          )}
+                        >
                           {capIcon(c)} {c}
                         </span>
                       ))}
@@ -102,7 +153,11 @@ export function ModelSelector({
                   </div>
                 </button>
               ))}
-              {filtered.length === 0 && <p className="text-sm text-center py-6 text-[#94A3B8]">No models found</p>}
+              {filtered.length === 0 && (
+                <p className="text-sm text-center py-6 text-[#94A3B8]">
+                  No models found
+                </p>
+              )}
             </div>
 
             <div className="p-3 bg-slate-50 dark:bg-white/5 border-t border-[rgba(148,163,184,0.12)]">

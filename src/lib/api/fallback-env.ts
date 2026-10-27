@@ -6,9 +6,16 @@
  * key can never be inlined into client JS even by accident. The public surface of
  * the app only ever sees the derived boolean from /api/models and /api/health.
  */
-const mayReadSecret = typeof window === "undefined" || process.env.NODE_ENV === "test";
+const mayReadSecret =
+  typeof window === "undefined" || process.env.NODE_ENV === "test";
 
-const KEY = mayReadSecret ? (process.env.AGNES_API_KEY || process.env.AGNES_API_KEY_FALLBACK || "").trim() : "";
+const KEY = mayReadSecret
+  ? (
+      process.env.AGNES_API_KEY ||
+      process.env.AGNES_API_KEY_FALLBACK ||
+      ""
+    ).trim()
+  : "";
 
 /** Never re-export this from a module a client component can reach. */
 export const AGNES_API_KEY = KEY;
