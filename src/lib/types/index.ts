@@ -2,7 +2,15 @@ export type ModelId =
   | "llama"
   | "gpt-5-nano"
   | "gemini-2.5-flash-lite"
-  | "deepseek-v3.2";
+  | "deepseek-v3.2"
+  | "agnes-2.0-flash"
+  | "agnes-2.5-flash"
+  | "agnes-3.0-flash";
+
+// Image model ids (separate from chat models but used in settings)
+export type ImageModelId = "flux-dev" | "agnes-image-2.1-flash" | "agnes-image-2.5-flash";
+// Video model ids
+export type VideoModelId = "wan-2.2" | "agnes-video-v2.0" | "agnes-video-2.5";
 
 export interface AIModel {
   id: ModelId;
@@ -14,6 +22,8 @@ export interface AIModel {
   color: string;
   icon: string;
   available: boolean;
+  streaming?: boolean;
+  vision?: boolean;
 }
 
 export interface ChatMessage {
@@ -25,6 +35,7 @@ export interface ChatMessage {
   error?: string;
   imageUrl?: string;
   videoUrl?: string;
+  images?: string[]; // data URIs or URLs attached to user message (vision)
 }
 
 export interface Conversation {

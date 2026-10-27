@@ -16,12 +16,12 @@ interface SettingsState extends UserSettings {
 
 const defaults: UserSettings = {
   theme: "dark",
-  defaultModel: "llama",
+  defaultModel: "agnes-2.0-flash",
   enterToSend: true,
   markdownRendering: true,
   defaultImageAspect: "1:1",
-  defaultImageModel: "flux-dev",
-  defaultVideoModel: "wan-2.2",
+  defaultImageModel: "agnes-image-2.1-flash",
+  defaultVideoModel: "agnes-video-v2.0",
   sidebarCollapsed: false,
   showContextPanel: true,
 };

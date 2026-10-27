@@ -11,6 +11,7 @@ import type { ChatMessage, ModelId } from "@/lib/types";
 import { MODELS } from "@/lib/api/config";
 import { toast } from "@/components/ui/Toast";
 import { cn } from "@/lib/utils/cn";
+import { isAgnesChatModel } from "@/lib/api/config";
 
 export function ChatWorkspace({
   onOpenMobileNav,
@@ -32,7 +33,6 @@ export function ChatWorkspace({
   const showPanel = useSettingsStore((s) => s.showContextPanel);
   const setContextPanel = useSettingsStore((s) => s.setContextPanel);
 
-  // The conversation owns the model; brand-new chats fall back to the saved default.
   const model: ModelId = active?.modelId ?? defaultModel;
 
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -40,7 +40,7 @@ export function ChatWorkspace({
   const abortRef = useRef<AbortController | null>(null);
 
   const requestAssistant = useCallback(
-    async (convId: string, prompt: string, history: { role: string; content: string }[], modelId: ModelId) => {
+    async (convId: string, prompt: string, history: { role: string; content: string; images?: string[] }[], modelId: ModelId, images?: string[]) => {
       const asstId = uid();
       addMessage(convId, { id: asstId, role: "assistant", content: "", timestamp: Date.now(), modelId });
       setPendingId(asstId);
@@ -49,21 +49,115 @@ export function ChatWorkspace({
       const controller = new AbortController();
       abortRef.current = controller;
 
+      const isAgnes = isAgnesChatModel(modelId);
+
       try {
+        const payload: Record<string, unknown> = { model: modelId, prompt, history };
+        if (images && images.length) payload.images = images;
+        // Also include aggregated images from history for vision context (already in history)
+        if (isAgnes) payload.stream = true;
+
         const res = await fetch("/api/chat", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model: modelId, prompt, history }),
+          headers: {
+            "Content-Type": "application/json",
+            Accept: isAgnes ? "text/event-stream" : "application/json",
+          },
+          body: JSON.stringify(payload),
           signal: controller.signal,
         });
-
-        const data = await res.json().catch(() => null);
 
         if (res.status === 499) {
           removeMessage(convId, asstId);
           toast.info("Generation stopped");
           return;
         }
+
+        // Streaming path for Agnes
+        const contentType = res.headers.get("content-type") || "";
+        if (isAgnes && contentType.includes("text/event-stream") && res.body) {
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          let full = "";
+          let gotToken = false;
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed) continue;
+              if (trimmed === "data: [DONE]") {
+                // done
+                continue;
+              }
+              if (trimmed.startsWith("data: ")) {
+                const data = trimmed.slice(6);
+                if (data === "[DONE]") continue;
+                try {
+                  const obj = JSON.parse(data);
+                  const token = obj.token ?? obj.content ?? obj.text ?? "";
+                  if (token) {
+                    full += token;
+                    gotToken = true;
+                    updateMessage(convId, asstId, { content: full, modelId });
+                  } else if (obj.error) {
+                    throw new Error(obj.error);
+                  }
+                } catch {
+                  // If not JSON, treat as raw token
+                  if (data && !data.includes('"')) {
+                    full += data;
+                    updateMessage(convId, asstId, { content: full, modelId });
+                    gotToken = true;
+                  }
+                }
+              }
+            }
+          }
+          // Handle leftover buffer
+          if (buffer.trim() && buffer.trim() !== "data: [DONE]") {
+            try {
+              const obj = JSON.parse(buffer.trim().slice(6));
+              const token = obj.token;
+              if (token) {
+                full += token;
+                updateMessage(convId, asstId, { content: full, modelId });
+                gotToken = true;
+              }
+            } catch {}
+          }
+
+          if (!gotToken && full.trim().length === 0) {
+            // Fallback: try to parse as JSON if streaming produced nothing but server returned JSON inside stream
+            // Check if we actually got an error payload
+            if (!res.ok) {
+              const errText = await res.text().catch(() => "");
+              let j: unknown = null;
+              try { j = JSON.parse(errText); } catch {}
+              const msg = (j as Record<string, unknown>)?.error as string || errText || "Generation failed";
+              updateMessage(convId, asstId, { error: String(msg) });
+              setServiceWarning(String(msg));
+              return;
+            }
+            // No tokens but still empty — mark as error
+            updateMessage(convId, asstId, { error: "No response received. Try again." });
+            setServiceWarning("No response received.");
+          }
+          // Ensure final content is trimmed and scaffold stripped
+          if (full.trim()) {
+            const clean = full.replace(/^\s*Assistant:\s*/i, "").replace(/^\s*Bliss:\s*/i, "").trim();
+            updateMessage(convId, asstId, { content: clean, modelId });
+          }
+          return;
+        }
+
+        // Non-stream JSON fallback
+        const data = await res.json().catch(() => null);
 
         if (!res.ok || !data?.success || typeof data.response !== "string" || !data.response.trim()) {
           const msg =
@@ -83,9 +177,15 @@ export function ChatWorkspace({
           toast.info("Generation stopped");
           return;
         }
-        const msg = "Bliss couldn't reach the AI service. Please try again.";
-        updateMessage(convId, asstId, { error: msg });
-        setServiceWarning(msg);
+        const msg = e instanceof Error ? e.message : "Bliss couldn't reach the AI service. Please try again.";
+        // Avoid overwriting if already has content from streaming
+        const existing = useChatStore.getState().conversations.find((c) => c.id === convId)?.messages.find((m) => m.id === asstId);
+        if (existing?.content && existing.content.trim().length > 0) {
+          // Keep partial response, just stop streaming marker
+        } else {
+          updateMessage(convId, asstId, { error: msg });
+          setServiceWarning(msg);
+        }
       } finally {
         if (abortRef.current === controller) abortRef.current = null;
         setPendingId(null);
@@ -95,17 +195,21 @@ export function ChatWorkspace({
   );
 
   const sendMessage = useCallback(
-    async (text: string) => {
+    async (text: string, images?: string[]) => {
       let convId = active?.id;
       if (!convId) convId = createConversation(model, text);
 
       const prior = useChatStore.getState().conversations.find((c) => c.id === convId);
       const history = (prior?.messages ?? [])
         .filter((m) => !m.error && m.content.trim())
-        .map((m) => ({ role: m.role, content: m.content }));
+        .map((m) => ({ role: m.role, content: m.content, images: (m as unknown as { images?: string[] }).images }));
 
-      addMessage(convId, { id: uid(), role: "user", content: text, timestamp: Date.now() });
-      await requestAssistant(convId, text, history, model);
+      // Store tiny thumbnails only for persistence (downscale to avoid localStorage bloat)
+      // For now store original but we could thumbnail in future
+      const thumbnails = images;
+
+      addMessage(convId, { id: uid(), role: "user", content: text, timestamp: Date.now(), images: thumbnails } as ChatMessage);
+      await requestAssistant(convId, text, history, model, images);
     },
     [active?.id, createConversation, addMessage, model, requestAssistant]
   );
@@ -120,8 +224,8 @@ export function ChatWorkspace({
       const history = active.messages
         .slice(0, active.messages.findIndex((m) => m.id === userMsg.id))
         .filter((m) => !m.error && m.content.trim())
-        .map((m) => ({ role: m.role, content: m.content }));
-      await requestAssistant(active.id, userMsg.content, history, active.modelId);
+        .map((m) => ({ role: m.role, content: m.content, images: (m as unknown as { images?: string[] }).images }));
+      await requestAssistant(active.id, userMsg.content, history, active.modelId, (userMsg as unknown as { images?: string[] }).images);
     },
     [active, removeMessage, requestAssistant]
   );
@@ -159,6 +263,7 @@ export function ChatWorkspace({
             <p className="truncate text-sm font-semibold">{active?.title ?? "New conversation"}</p>
             <p className="hidden truncate text-[11px] text-[#94A3B8] sm:block">
               {active ? `${active.messages.length} messages · ${modelName}` : `Ready · ${modelName}`}
+              {isAgnesChatModel(model) && " · Streaming"}
             </p>
           </div>
 
@@ -187,7 +292,7 @@ export function ChatWorkspace({
           <div className="flex items-center gap-2 border-b border-[#F59E0B]/20 bg-[#F59E0B]/10 px-4 py-2 text-xs text-amber-700 dark:text-amber-300">
             <WifiOff className="h-3.5 w-3.5 shrink-0" />
             <span className="flex-1">
-              The upstream AI service didn&rsquo;t answer after automatic retries. Switch model or try again in a moment.
+              The upstream AI service didn&apos;t answer after automatic retries. Switch model or try again in a moment.
             </span>
             {active && (
               <button
@@ -227,7 +332,7 @@ export function ChatWorkspace({
         )}
 
         <Composer
-          onSend={(t) => void sendMessage(t)}
+          onSend={(t, imgs) => void sendMessage(t, imgs)}
           onStop={stop}
           isStreaming={!!pendingId}
           selectedModel={model}

@@ -33,8 +33,8 @@ function mockUpstream(overrides: Partial<{ image: string; video: string; failCha
       if (path === "/api/health") {
         return Response.json({
           status: "operational",
-          services: { text: { reachable: true, latency: 420 }, image: { reachable: true, latency: 900 } },
-          capabilities: { chat: true, imageGeneration: true, vision: false, streaming: false },
+          services: { text: { reachable: true, latency: 420 }, image: { reachable: true, latency: 900 }, agnes: { reachable: true, latency: 300 } },
+          capabilities: { chat: true, imageGeneration: true, vision: true, streaming: true, textToVideo: true, nativeConversationContext: true },
         });
       }
       if (path === "/api/chat") {
@@ -46,10 +46,22 @@ function mockUpstream(overrides: Partial<{ image: string; video: string; failCha
         return Response.json({ success: true, response: UPSTREAM.response, model: body.model });
       }
       if (path === "/api/image") {
-        return Response.json({ success: true, imageUrl: overrides.image ?? "https://cdn.test/gen-1.jpg" });
+        return Response.json({ success: true, imageUrl: overrides.image ?? "https://cdn.test/gen-1.jpg", model: "flux-dev" });
       }
       if (path === "/api/video") {
-        return Response.json({ success: true, videoUrl: overrides.video ?? "https://cdn.test/clip.mp4" });
+        // Support both async Agnes (videoId) and sync WAN (videoUrl) flows
+        try {
+          const body = init?.body ? JSON.parse(String(init.body)) : {};
+          if (body.model && String(body.model).startsWith("agnes-video")) {
+            // Agnes async flow: first POST returns videoId
+            return Response.json({ success: true, videoId: "vid_mock_123", status: "queued" });
+          }
+        } catch {}
+        return Response.json({ success: true, videoUrl: overrides.video ?? "https://cdn.test/clip.mp4", model: "wan-2.2" });
+      }
+      if (path.startsWith("/api/video/")) {
+        // Polling for Agnes
+        return Response.json({ success: true, status: "completed", videoUrl: overrides.video ?? "https://cdn.test/clip.mp4" });
       }
       return Response.json({ ok: true });
     }
@@ -64,6 +76,7 @@ function mockUpstream(overrides: Partial<{ image: string; video: string; failCha
 beforeEach(() => {
   localStorage.clear();
   useChatStore.setState({ conversations: [], activeId: null });
+  useSettingsStore.setState({ defaultImageModel: "flux-dev", defaultVideoModel: "wan-2.2" }); // use WAN for legacy e2e tests that expect sync behavior
   mockUpstream();
 });
 
@@ -89,7 +102,8 @@ describe("Bliss end-to-end journey", () => {
 
   it("3-4. selecting a model changes the model actually used for the next request", async () => {
     renderApp();
-    await userEvent.click(screen.getByRole("button", { name: /llama 3.3/i }));
+    // Default is now Agnes 2.0 Flash (Pesles AI); click it to open selector then pick DeepSeek
+    await userEvent.click(screen.getByRole("button", { name: /agnes 2\.0 flash/i }));
     await userEvent.click(await screen.findByText("DeepSeek V3.2"));
 
     const box = screen.getByRole("textbox", { name: /message bliss/i });
@@ -173,7 +187,7 @@ describe("Bliss end-to-end journey", () => {
     await userEvent.type(screen.getByPlaceholderText(/make this image look cinematic/i), "make it a watercolor");
     // Validation first: no source provided.
     await userEvent.click(screen.getByRole("button", { name: /apply edit/i }));
-    expect(await screen.findByText(/needs a publicly accessible source image URL/i)).toBeInTheDocument();
+    expect(await screen.findByText(/editing needs a source/i)).toBeInTheDocument();
 
     await userEvent.type(screen.getByPlaceholderText(/https:\/\/…\/photo\.jpg/i), "https://cdn.test/source.jpg");
     await userEvent.click(screen.getByRole("button", { name: /apply edit/i }));
@@ -181,15 +195,16 @@ describe("Bliss end-to-end journey", () => {
     await waitFor(() => expect(document.querySelector("img[src='https://cdn.test/edited.jpg']")).toBeTruthy());
   });
 
-  it("11b. video studio refuses text-only requests instead of faking a clip", async () => {
+  it("11b. video studio supports WAN guard (image required)", async () => {
     renderApp();
     await userEvent.click(screen.getByRole("button", { name: /^video studio$/i }));
+    // Ensure WAN model is selected — useSettingsStore was preset to wan-2.2 in beforeEach
     await userEvent.click(screen.getByRole("button", { name: /generate video/i }));
     expect(await screen.findByText(/source image url is required/i)).toBeInTheDocument();
     expect(screen.queryByRole("video")).not.toBeInTheDocument();
   });
 
-  it("11c. video studio shows the returned clip", async () => {
+  it("11c. video studio shows the returned clip (WAN sync)", async () => {
     mockUpstream({ video: "https://cdn.test/clip.mp4" });
     renderApp();
     await userEvent.click(screen.getByRole("button", { name: /^video studio$/i }));
@@ -246,15 +261,15 @@ describe("Bliss end-to-end journey", () => {
     await waitFor(() => expect(useChatStore.getState().conversations).toHaveLength(0));
   });
 
-  it("the API Explorer documents only verified endpoints and labels what is unavailable", async () => {
+  it("the API Explorer documents verified endpoints including Pesles AI and streaming", async () => {
     renderApp();
     await userEvent.click(screen.getByRole("button", { name: /api explorer/i }));
     expect(await screen.findByText(/flux dev image generation/i)).toBeInTheDocument();
     expect(screen.getByText(/WAN 2.2 image to video/i)).toBeInTheDocument();
-    expect(screen.getByText(/Not implemented because it isn/i)).toBeInTheDocument();
-    // no invented endpoints
-    expect(screen.queryByText(/chat\/completions/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/realtime streaming/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Agnes Video V2.0 async/i)).toBeInTheDocument();
+    // Pesles AI endpoints are verified and documented — may appear multiple times (chat models)
+    expect(screen.getAllByText(/chat\/completions/i).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Pesles AI/i).length).toBeGreaterThan(0);
   });
 
   it("history search finds messages inside conversations", async () => {

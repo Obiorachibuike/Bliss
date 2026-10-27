@@ -1,12 +1,12 @@
 "use client";
 import { useState } from "react";
-import { Code2, Copy, Check, ChevronDown, ExternalLink, Circle, Zap, Server, ShieldAlert, Menu } from "lucide-react";
+import { Code2, Copy, Check, ChevronDown, ExternalLink, Circle, Zap, Server, ShieldAlert, Menu, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 import { toast } from "@/components/ui/Toast";
-import { MODELS, API_HOST } from "@/lib/api/config";
+import { MODELS, API_HOST, AGNES_API_BASE } from "@/lib/api/config";
 
 interface Param {
   name: string;
@@ -19,7 +19,7 @@ interface EndpointDoc {
   name: string;
   method: "GET" | "POST";
   path: string;
-  group: "Upstream · CVRON" | "Bliss internal";
+  group: "Upstream · CVRON" | "Upstream · Pesles AI" | "Bliss internal";
   params: Param[];
   example: string;
   response: string;
@@ -28,23 +28,34 @@ interface EndpointDoc {
 }
 
 const BASE = API_HOST;
+const AGNES = AGNES_API_BASE;
 
 const DOCS: EndpointDoc[] = [
   ...MODELS.map((m) => ({
     key: `chat-${m.id}`,
     name: `${m.name} completion`,
-    method: "GET" as const,
+    method: (m.provider.includes("Agnes") ? "POST" : "GET") as "GET" | "POST",
     path: m.endpoint,
-    group: "Upstream · CVRON" as const,
-    params: [{ name: "prompt", type: "string", required: true, desc: "The full prompt. The endpoint is single-turn — it has no messages array." }],
-    example: `curl "${m.endpoint}?prompt=Explain%20gravity%20simply"`,
-    response: `{\n  "success": true,\n  "response": "Gravity is the pull between masses…",\n  "prompt": "Explain gravity simply",\n  "author": "@cvroon"\n}`,
+    group: (m.provider.includes("Agnes") ? "Upstream · Pesles AI" : "Upstream · CVRON") as EndpointDoc["group"],
+    params: m.provider.includes("Agnes")
+      ? [
+          { name: "model", type: "string", required: true, desc: `Model ID: ${m.id}` },
+          { name: "messages", type: "Message[]", required: true, desc: "OpenAI-compatible messages array; supports image_url for vision when provider is Agnes" },
+          { name: "stream", type: "boolean", required: false, desc: "Set true for SSE streaming (Agnes only)" },
+        ]
+      : [{ name: "prompt", type: "string", required: true, desc: "The full prompt. The endpoint is single-turn — it has no messages array." }],
+    example: m.provider.includes("Agnes")
+      ? `curl ${AGNES}/chat/completions \\\n  -H "Authorization: Bearer $AGNES_API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '{\n    "model": "${m.id}",\n    "messages": [{ "role": "user", "content": "Explain gravity simply" }],\n    "stream": true\n  }'`
+      : `curl "${m.endpoint}?prompt=Explain%20gravity%20simply"`,
+    response: m.provider.includes("Agnes")
+      ? `// Streaming SSE:\ndata: {"token": "Gravity is "}\ndata: {"token": "the pull between masses…"}\ndata: [DONE]`
+      : `{\n  "success": true,\n  "response": "Gravity is the pull between masses…",\n  "prompt": "Explain gravity simply",\n  "author": "@cvroon"\n}`,
     capabilities: m.capabilities,
-    limitation: "No streaming, no native conversation context, no system message. Bliss compresses your last 6 turns into the prompt.",
+    limitation: m.provider.includes("Agnes") ? "Agnes free tier 20 RPM; 401→perm bench, 429→60s bench, 402→1h bench." : "No streaming, no native conversation context, no system message. Bliss compresses your last 6 turns into the prompt.",
   })),
   {
     key: "image-flux",
-    name: "Flux Dev image generation",
+    name: "Flux Dev image generation (CVRON)",
     method: "GET",
     path: `${BASE}/cvronai/flux-dev.php`,
     group: "Upstream · CVRON",
@@ -55,8 +66,27 @@ const DOCS: EndpointDoc[] = [
     limitation: "One image per call, no seed, no size parameter. Returned URLs are temporary third-party hosting.",
   },
   {
+    key: "image-agnes",
+    name: "Agnes Image 2.1 Flash generation",
+    method: "POST",
+    path: `${AGNES}/images/generations`,
+    group: "Upstream · Pesles AI",
+    params: [
+      { name: "model", type: "string", required: true, desc: "agnes-image-2.1-flash or agnes-image-2.5-flash" },
+      { name: "prompt", type: "string", required: true, desc: "Text instruction for generation/editing" },
+      { name: "size", type: "string", required: true, desc: "1K/2K/3K/4K tier (also accepts legacy 1024x768 but normalized)" },
+      { name: "ratio", type: "string", required: false, desc: "1:1,16:9,9:16,3:4,4:3,2:3,3:2,21:9 default 1:1" },
+      { name: "extra_body.image", type: "string[]", required: false, desc: "Image URLs or base64 data URIs for image-to-image (must be in extra_body)" },
+      { name: "extra_body.response_format", type: "string", required: false, desc: "url or b64_json — MUST be in extra_body, not top-level" },
+    ],
+    example: `curl ${AGNES}/images/generations \\\n  -H "Authorization: Bearer $AGNES_API_KEY" \\\n  -d '{\n    "model": "agnes-image-2.1-flash",\n    "prompt": "A luminous city above a canyon, cinematic realism",\n    "size": "2K",\n    "ratio": "16:9",\n    "extra_body": { "response_format": "url" }\n  }'\n// → { data: [{ url: "https://..." }] }`,
+    response: `{\n  "data": [{ "url": "https://.../image.jpg" }]\n}`,
+    capabilities: ["Text-to-Image", "Image-to-Image", "Multi-image", "4K"],
+    limitation: "response_format must be nested in extra_body; size tiers normalized to exact pixels; 1/min for 3K/4K.",
+  },
+  {
     key: "image-edit",
-    name: "Image to image editing",
+    name: "Image to image editing (CVRON)",
     method: "GET",
     path: `${BASE}/cvronai/image2image.php`,
     group: "Upstream · CVRON",
@@ -70,6 +100,25 @@ const DOCS: EndpointDoc[] = [
     limitation: "Source must already be public. Bliss cannot upload local files for the upstream to fetch.",
   },
   {
+    key: "video-agnes",
+    name: "Agnes Video V2.0 async generation",
+    method: "POST",
+    path: `${AGNES}/videos`,
+    group: "Upstream · Pesles AI",
+    params: [
+      { name: "model", type: "string", required: true, desc: "agnes-video-v2.0 or agnes-video-2.5" },
+      { name: "prompt", type: "string", required: true, desc: "Motion description; use <Picture N> refs in reference mode" },
+      { name: "image", type: "string", required: false, desc: "Single image URL for image-to-video" },
+      { name: "extra_body.image", type: "string[]", required: false, desc: "Multiple URLs/base64 for keyframe animation + mode:keyframes" },
+      { name: "num_frames", type: "integer", required: false, desc: "Must be ≤441 and 8n+1 (81,121,…,441) — server snaps automatically" },
+      { name: "width", type: "integer", required: false, desc: "Default 1152, snapped to 480p/720p/1080p tiers" },
+    ],
+    example: `curl -X POST ${AGNES}/videos \\\n  -H "Authorization: Bearer $AGNES_API_KEY" \\\n  -d '{\n    "model": "agnes-video-v2.0",\n    "prompt": "Cinematic cat on beach at sunset, gentle waves",\n    "height": 768, "width": 1152, "num_frames": 121, "frame_rate": 24\n  }'\n// → { video_id: "vid_..." }\n// Poll: GET https://apihub.agnes-ai.com/agnesapi?video_id=vid_...`,
+    response: `{\n  "video_id": "vid_abc123",\n  "status": "queued"\n}\n// polling GET returns: { status: "completed", video_url: "https://...mp4" }`,
+    capabilities: ["Text-to-Video", "Image-to-Video", "Keyframe", "Async polling"],
+    limitation: "Free tier 1/min video; tasks account-scoped — polling must use same key that created task.",
+  },
+  {
     key: "image-host",
     name: "FileBin image host",
     method: "GET",
@@ -77,7 +126,7 @@ const DOCS: EndpointDoc[] = [
     group: "Upstream · CVRON",
     params: [{ name: "url", type: "url", required: true, desc: "Image URL to re-host" }],
     example: `curl "${BASE}/cvronai/up.php?url=https://example.com/a.jpg"`,
-    response: `// Response shape is not documented; Bliss parses url | image_url | link | data,\n// falling back to a plain-text URL body.`,
+    response: `// Response shape is not documented; Bliss parses url | image_url | link | data,`,
     capabilities: ["Hosting"],
     limitation: "Undocumented response format — Bliss validates the parsed URL before using it.",
   },
@@ -98,48 +147,55 @@ const DOCS: EndpointDoc[] = [
   },
   {
     key: "chat-route",
-    name: "Bliss chat proxy",
+    name: "Bliss chat proxy (with streaming)",
     method: "POST",
     path: "/api/chat",
     group: "Bliss internal",
     params: [
-      { name: "model", type: "ModelId", required: true, desc: "llama | gpt-5-nano | gemini-2.5-flash-lite | deepseek-v3.2 — validated against a fixed allow-list" },
-      { name: "prompt", type: "string", required: true, desc: "User message, max 8000 chars" },
-      { name: "history", type: "Message[]", required: false, desc: "Prior turns; the last 6 are folded into a single prompt" },
+      { name: "model", type: "ModelId", required: true, desc: "7 verified chat ids: llama | gpt-5-nano | gemini-2.5-flash-lite | deepseek-v3.2 | agnes-2.0-flash | agnes-2.5-flash | agnes-3.0-flash" },
+      { name: "prompt", type: "string", required: true, desc: "User message, max 4000 chars" },
+      { name: "history", type: "Message[]", required: false, desc: "Prior turns; last 8 folded or sent as messages for Agnes" },
+      { name: "images", type: "string[]", required: false, desc: "Base64 data URIs or URLs for Agnes vision (max 4, 2048px)" },
+      { name: "stream", type: "boolean", required: false, desc: "true → SSE streaming (Agnes only)" },
     ],
-    example: `fetch("/api/chat", {\n  method: "POST",\n  headers: { "Content-Type": "application/json" },\n  body: JSON.stringify({\n    model: "llama",\n    prompt: "Hello!",\n    history: [{ role: "user", content: "Hi" }],\n  }),\n})`,
-    response: `{\n  "success": true,\n  "response": "Hey! What can I help you build?",\n  "model": "llama"\n}`,
-    capabilities: ["Rate limited", "Input validation", "Retries", "Timeouts"],
-    limitation: "20 requests / minute / IP. Upstream failures return 502 with a friendly message; the raw error is only surfaced in development.",
+    example: `fetch("/api/chat", {\n  method: "POST",\n  headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },\n  body: JSON.stringify({ model: "agnes-2.0-flash", prompt: "Hello!", history: [], stream: true })\n}) // → SSE: data: {"token":"Hi"}`,
+    response: `// JSON fallback:\n{ "success": true, "response": "Hey! What can I help you build?", "model": "agnes-2.0-flash" }\n// Streaming: text/event-stream with data: {"token":"..."}`,
+    capabilities: ["Streaming (Agnes)", "Rate limited 20/min/IP", "Key pool rotation + bench", "Vision"],
+    limitation: "Agnes requires AGNES_API_KEY_1; CVRON needs no key. Frontend never sees keys.",
   },
   {
     key: "image-route",
-    name: "Bliss image route",
+    name: "Bliss image route (unified)",
     method: "POST",
     path: "/api/image",
     group: "Bliss internal",
     params: [
-      { name: "mode", type: '"generate" | "edit"', required: false, desc: "Defaults to generate" },
-      { name: "prompt", type: "string", required: true, desc: "Max 1000 characters" },
-      { name: "imageUrl", type: "url", required: false, desc: "Required for edit; http/https only" },
+      { name: "model", type: "string", required: false, desc: "flux-dev or agnes-image-2.1-flash/2.5-flash (default agnes when keys present)" },
+      { name: "prompt", type: "string", required: true, desc: "Max 2000 chars" },
+      { name: "size", type: "string", required: false, desc: "1K/2K/3K/4K for Agnes (extra_body tier)" },
+      { name: "ratio", type: "string", required: false, desc: "1:1,16:9 etc for Agnes" },
+      { name: "images", type: "string[]", required: false, desc: "URLs or base64 data URIs — sent as extra_body.image for Agnes" },
+      { name: "imageUrl", type: "url", required: false, desc: "Single URL for edit/back-compat" },
     ],
-    example: `fetch("/api/image", {\n  method: "POST",\n  body: JSON.stringify({ mode: "generate", prompt: "A blue planet" }),\n})`,
-    response: `{ "success": true, "imageUrl": "https://…/image.jpg" }`,
-    capabilities: ["SSRF-safe URL checks", "Timeout 90s / 120s"],
+    example: `fetch("/api/image", {\n  method: "POST",\n  body: JSON.stringify({ prompt: "A blue planet", model: "agnes-image-2.1-flash", size: "2K", ratio: "16:9", images: ["data:image/..."] })\n})`,
+    response: `{ "success": true, "imageUrl": "https://…/image.jpg", "model": "agnes-image-2.1-flash", "provider": "agnes" }`,
+    capabilities: ["SSRF-safe checks", "extra_body.response_format url handling"],
   },
   {
     key: "video-route",
-    name: "Bliss video route",
+    name: "Bliss video route (async for Agnes)",
     method: "POST",
     path: "/api/video",
     group: "Bliss internal",
     params: [
       { name: "prompt", type: "string", required: true, desc: "Motion description" },
-      { name: "imageUrl", type: "url", required: true, desc: "Validated http/https source image" },
+      { name: "model", type: "string", required: false, desc: "wan-2.2 or agnes-video-v2.0/v2.5" },
+      { name: "images", type: "string[]", required: false, desc: "1 = image-to-video, 2+ = keyframes (extra_body.image + mode:keyframes)" },
+      { name: "num_frames", type: "integer", required: false, desc: "81,121,…,441 (8n+1 snapped)" },
     ],
-    example: `fetch("/api/video", {\n  method: "POST",\n  body: JSON.stringify({ prompt: "Drifting clouds", imageUrl: "https://…/sky.jpg" }),\n})`,
-    response: `{ "success": true, "videoUrl": "https://…/clip.mp4" }`,
-    capabilities: ["maxDuration 300s"],
+    example: `fetch("/api/video", { method: "POST", body: JSON.stringify({ prompt: "Drifting clouds", imageUrl: "https://…/sky.jpg", model: "agnes-video-v2.0" }) })\n// → { success:true, videoId:"vid_...", pollUrl:"/api/video/vid_..." }`,
+    response: `// POST creates task:\n{ "success": true, "videoId": "vid_123", "status": "queued" }\n// GET /api/video/:id polls:\n{ "success": true, "status": "completed", "videoUrl": "https://...mp4" }`,
+    capabilities: ["Async polling every 5s", "8n+1 snap", "Same-key polling"],
   },
   {
     key: "health-route",
@@ -149,8 +205,8 @@ const DOCS: EndpointDoc[] = [
     group: "Bliss internal",
     params: [],
     example: `fetch("/api/health").then(r => r.json())`,
-    response: `{ "status": "operational", "services": { "text": { "reachable": true, "latency": 812 }, "image": { "reachable": true, "latency": 2140 } } }`,
-    capabilities: ["Diagnostics"],
+    response: `{ "status": "operational", "services": { "text": { "reachable": true, "latency": 812 } } }`,
+    capabilities: ["Diagnostics", "Key pool stats"],
   },
   {
     key: "models-route",
@@ -160,16 +216,16 @@ const DOCS: EndpointDoc[] = [
     group: "Bliss internal",
     params: [],
     example: `fetch("/api/models").then(r => r.json())`,
-    response: `{ "success": true, "text": [...], "image": [...], "video": [...], "limitations": {...} }`,
+    response: `{ "success": true, "text": [...7], "image": [...3], "video": [...3], "agnes": { "configured": true } }`,
     capabilities: ["Discovery"],
-    limitation: "A static verified configuration — the provider exposes no model-list endpoint of its own.",
+    limitation: "Static verified config — providers expose no list endpoint.",
   },
 ];
 
 export function ApiExplorer({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
-  const [open, setOpen] = useState<string | null>("chat-llama");
+  const [open, setOpen] = useState<string | null>("chat-agnes-2.0-flash");
   const [copied, setCopied] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "Upstream · CVRON" | "Bliss internal">("all");
+  const [filter, setFilter] = useState<"all" | "Upstream · CVRON" | "Upstream · Pesles AI" | "Bliss internal">("all");
 
   const copy = async (text: string, id: string) => {
     await navigator.clipboard.writeText(text);
@@ -190,13 +246,20 @@ export function ApiExplorer({ onOpenMobileNav }: { onOpenMobileNav: () => void }
           <h1 className="flex items-center gap-2 text-sm font-semibold">
             <Code2 className="h-4 w-4 text-[#2563EB]" /> API Explorer
           </h1>
-          <p className="hidden text-[11px] text-[#94A3B8] sm:block">Every integration Bliss uses, verified against the source repo</p>
+          <p className="hidden text-[11px] text-[#94A3B8] sm:block">CVRON + Pesles AI (Agnes) — every integration Bliss uses</p>
         </div>
-        <a href="https://github.com/cvroon-api/FreeAiAPIs" target="_blank" rel="noopener noreferrer">
-          <Button size="sm" variant="outline" className="gap-1.5">
-            <ExternalLink className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Source repo</span>
-          </Button>
-        </a>
+        <div className="flex gap-2">
+          <a href="https://github.com/cvroon-api/FreeAiAPIs" target="_blank" rel="noopener noreferrer">
+            <Button size="sm" variant="outline" className="gap-1.5 hidden sm:flex">
+              <ExternalLink className="h-3.5 w-3.5" /> CVRON
+            </Button>
+          </a>
+          <a href="https://agnes-ai.com/doc/overview" target="_blank" rel="noopener noreferrer">
+            <Button size="sm" variant="outline" className="gap-1.5">
+              <Sparkles className="h-3.5 w-3.5" /> Agnes Docs
+            </Button>
+          </a>
+        </div>
       </header>
 
       <div className="flex-1 overflow-y-auto">
@@ -204,15 +267,15 @@ export function ApiExplorer({ onOpenMobileNav }: { onOpenMobileNav: () => void }
           <div className="flex items-start gap-2 rounded-xl border border-[#2563EB]/20 bg-[#EFF6FF] px-3.5 py-3 text-xs leading-relaxed text-[#1D4ED8] dark:bg-[#2563EB]/10 dark:text-[#93C5FD]">
             <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              No credentials exist for this provider — it is a free, key-less API. Bliss still keeps every call on the server
-              so the browser never talks to the upstream directly, and adds validation, timeouts, retries and per-IP rate limits.
+              <b>Pesles AI (Agnes):</b> Requires server-side AGNES_API_KEY_n — Bliss proxies every call so keys never reach the browser. Key pool rotates round-robin, benches 429/60s, 402/1h, 401 perm. Video polling uses same key.
+              <br /><b>CVRON:</b> Free key-less public API — no secrets, but rate-limited and occasionally offline.
             </span>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {(["all", "Upstream · CVRON", "Bliss internal"] as const).map((f) => (
+            {(["all", "Upstream · CVRON", "Upstream · Pesles AI", "Bliss internal"] as const).map((f) => (
               <button key={f} onClick={() => setFilter(f)} className={cn("flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition", filter === f ? "border-transparent brand-gradient text-white" : "hover:bg-slate-50 dark:hover:bg-white/5")}>
-                {f === "Upstream · CVRON" ? <Zap className="h-3 w-3" /> : f === "Bliss internal" ? <Server className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
+                {f === "Upstream · CVRON" ? <Zap className="h-3 w-3" /> : f === "Upstream · Pesles AI" ? <Sparkles className="h-3 w-3" /> : f === "Bliss internal" ? <Server className="h-3 w-3" /> : <Circle className="h-3 w-3" />}
                 {f}
               </button>
             ))}
@@ -231,7 +294,7 @@ export function ApiExplorer({ onOpenMobileNav }: { onOpenMobileNav: () => void }
                       <p className="truncate text-sm font-semibold">{d.name}</p>
                       <p className="truncate font-mono text-[11px] text-[#94A3B8]">{d.path}</p>
                     </div>
-                    <Badge className={cn("hidden shrink-0 sm:inline-flex", d.group === "Bliss internal" && "border-[#2563EB]/20 bg-[#EFF6FF] text-[#2563EB] dark:bg-[#2563EB]/15 dark:text-[#60A5FA]")}>
+                    <Badge className={cn("hidden shrink-0 sm:inline-flex", d.group === "Bliss internal" ? "border-[#2563EB]/20 bg-[#EFF6FF] text-[#2563EB] dark:bg-[#2563EB]/15 dark:text-[#60A5FA]" : d.group === "Upstream · Pesles AI" ? "border-[#7C3AED]/20 bg-[#F5F3FF] text-[#7C3AED]" : "")}>
                       {d.group}
                     </Badge>
                     <ChevronDown className={cn("h-4 w-4 shrink-0 text-[#94A3B8] transition-transform", isOpen && "rotate-180")} />
@@ -286,11 +349,11 @@ export function ApiExplorer({ onOpenMobileNav }: { onOpenMobileNav: () => void }
             })}
           </div>
 
-          <Card className="border-dashed">
+          <Card className="border-[#7C3AED]/20 bg-[#F5F3FF] dark:bg-[#7C3AED]/10">
             <CardContent className="text-xs leading-relaxed text-[#94A3B8]">
-              <strong className="text-slate-700 dark:text-slate-200">Not implemented because it isn&rsquo;t documented:</strong> vision /
-              image analysis, text-to-video, streaming responses, embeddings, function calling and model listing. Bliss shows
-              these as unavailable rather than simulating them.
+              <strong className="text-slate-700 dark:text-slate-200">Deploying — Pesles AI (Agnes) setup:</strong>
+              <pre className="mt-2 overflow-x-auto rounded-lg bg-white p-2 font-mono text-[11px] dark:bg-[#0B1220]">{`cp .env.example .env\n# add as many as you want, server auto-detects\nAGNES_API_KEY_1=sk-...\nAGNES_API_KEY_2=sk-...\nAGNES_API_KEY_3=sk-...\n# or comma-separated / single:\nAGNES_API_KEYS=sk-...,sk-...\nAGNES_API_KEY=sk-...\n\nnpm install\nnpm start # → http://localhost:3000`}</pre>
+              <p className="mt-2">Deploy anywhere Node 18+ runs (Vercel, Render, Fly.io). Set AGNES_API_KEY on host, point Pesles AI DNS at it, enable HTTPS. $0 promo pricing may change.</p>
             </CardContent>
           </Card>
         </div>

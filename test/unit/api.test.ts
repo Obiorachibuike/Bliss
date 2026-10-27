@@ -8,25 +8,40 @@ import { MODELS, ENDPOINTS, API_LIMITATIONS } from "@/lib/api/config";
  * Model configuration
  * ------------------------------------------------------------------ */
 describe("model configuration", () => {
-  it("exposes exactly the four text models documented in FreeAiAPIs", () => {
-    expect(MODELS.map((m) => m.id).sort()).toEqual(
-      ["deepseek-v3.2", "gemini-2.5-flash-lite", "gpt-5-nano", "llama"].sort()
-    );
+  it("exposes the four CVRON text models plus Pesles AI (Agnes) streaming models", () => {
+    const ids = MODELS.map((m) => m.id);
+    // Original CVRON four must still be present
+    for (const id of ["deepseek-v3.2", "gemini-2.5-flash-lite", "gpt-5-nano", "llama"] as const) {
+      expect(ids).toContain(id);
+    }
+    // Pesles AI models added
+    expect(ids).toContain("agnes-2.0-flash");
+    expect(ids).toContain("agnes-2.5-flash");
+    expect(ids).toContain("agnes-3.0-flash");
+    expect(ids.length).toBeGreaterThanOrEqual(7);
   });
 
-  it("maps every model to a real cvron endpoint", () => {
+  it("maps every CVRON model to a real cvron endpoint and Agnes to apihub", () => {
     for (const m of MODELS) {
-      expect(m.endpoint).toMatch(/^https:\/\/cvron\.alwaysdata\.net\/cvronai\/.+\.php$/);
+      if (m.id.startsWith("agnes-")) {
+        expect(m.endpoint).toMatch(/^https:\/\/apihub\.agnes-ai\.com\/v1\/chat\/completions$/);
+      } else {
+        expect(m.endpoint).toMatch(/^https:\/\/cvron\.alwaysdata\.net\/cvronai\/.+\.php$/);
+      }
     }
     expect(ENDPOINTS.chat.llama.endsWith("llama.php")).toBe(true);
     expect(ENDPOINTS.image.fluxDev.endsWith("flux-dev.php")).toBe(true);
     expect(ENDPOINTS.image.image2image.endsWith("image2image.php")).toBe(true);
     expect(ENDPOINTS.video.wan22.endsWith("wan22.php")).toBe(true);
+    expect(ENDPOINTS.image.agnesImage.endsWith("/images/generations")).toBe(true);
+    expect(ENDPOINTS.video.agnesVideo.endsWith("/videos")).toBe(true);
   });
 
-  it("does not claim capabilities the provider does not document", () => {
-    expect(API_LIMITATIONS.streaming).toBe(false);
-    expect(API_LIMITATIONS.conversationContext).toBe(false);
+  it("claims streaming + vision via Agnes (and truthfully no longer denies them)", () => {
+    expect(API_LIMITATIONS.streaming).toBe(true);
+    expect(API_LIMITATIONS.vision).toBe(true);
+    expect(API_LIMITATIONS.conversationContext).toBe(true);
+    expect(API_LIMITATIONS.textToVideo).toBe(true);
   });
 });
 

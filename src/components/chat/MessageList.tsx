@@ -82,7 +82,6 @@ export function MessageList({
   const [editing, setEditing] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
 
-  // auto-scroll only when the user is near the bottom
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -96,7 +95,12 @@ export function MessageList({
 
   useEffect(() => {
     if (stickRef.current) bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages.length, streamingId]);
+  }, [messages]);
+
+  // Also stick on streaming content updates
+  useEffect(() => {
+    if (streamingId && stickRef.current) bottomRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
+  }, [messages.map((m) => m.content).join(""), streamingId]);
 
   return (
     <div ref={scrollRef} className="flex-1 overflow-y-auto">
@@ -105,6 +109,7 @@ export function MessageList({
           {messages.map((m) => {
             const isUser = m.role === "user";
             const isStreamingThis = streamingId === m.id;
+            const images = (m as unknown as { images?: string[] }).images;
             return (
               <div
                 key={m.id}
@@ -132,6 +137,9 @@ export function MessageList({
                       <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-white/10 dark:text-slate-300">
                         {m.modelId}
                       </span>
+                    )}
+                    {isStreamingThis && !isUser && (
+                      <span className="flex items-center gap-1 text-[10px] font-medium text-[#2563EB]"><span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#2563EB]" /> streaming</span>
                     )}
                   </div>
 
@@ -167,8 +175,18 @@ export function MessageList({
                         </div>
                       </div>
                     ) : (
-                      <div className="max-w-[88ch] whitespace-pre-wrap rounded-2xl rounded-tr-md border border-[rgba(148,163,184,0.12)] bg-slate-100/80 px-4 py-3 text-sm leading-relaxed text-slate-800 dark:bg-white/[0.07] dark:text-slate-100">
-                        {m.content}
+                      <div className="flex flex-col items-end gap-2 max-w-[88ch]">
+                        {images && images.length > 0 && (
+                          <div className="flex flex-wrap justify-end gap-2">
+                            {images.map((src, idx) => (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img key={idx} src={src} alt={`attachment ${idx + 1}`} className="h-24 w-24 rounded-xl border object-cover" />
+                            ))}
+                          </div>
+                        )}
+                        <div className="whitespace-pre-wrap rounded-2xl rounded-tr-md border border-[rgba(148,163,184,0.12)] bg-slate-100/80 px-4 py-3 text-sm leading-relaxed text-slate-800 dark:bg-white/[0.07] dark:text-slate-100">
+                          {m.content}
+                        </div>
                       </div>
                     )
                   ) : (
@@ -178,7 +196,7 @@ export function MessageList({
                           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                           <span>{m.error}</span>
                         </div>
-                      ) : isStreamingThis ? (
+                      ) : isStreamingThis && !m.content ? (
                         <div className="flex items-center gap-2 rounded-2xl border border-[rgba(148,163,184,0.12)] bg-white px-4 py-3 dark:bg-[#101827]">
                           <Sparkles className="h-4 w-4 animate-pulse text-[#2563EB]" />
                           <span className="text-sm text-[#94A3B8]">Thinking…</span>
@@ -189,7 +207,10 @@ export function MessageList({
                           </span>
                         </div>
                       ) : (
-                        <MarkdownRenderer content={m.content} />
+                        <>
+                          <MarkdownRenderer content={m.content} />
+                          {isStreamingThis && m.content && <span className="inline-block h-3 w-0.5 animate-pulse bg-[#2563EB] ml-0.5" />}
+                        </>
                       )}
                     </div>
                   )}

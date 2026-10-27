@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Settings as SettingsIcon, Sun, Moon, Monitor, Trash2, Database, Shield, Info, Menu, Check } from "lucide-react";
+import { Settings as SettingsIcon, Sun, Moon, Monitor, Trash2, Database, Shield, Info, Menu, Check, Sparkles } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +42,13 @@ function Row({ title, desc, children }: { title: string; desc: string; children:
 export function SettingsView({ onOpenMobileNav }: { onOpenMobileNav: () => void }) {
   const s = useSettingsStore();
   const { theme, setTheme } = useTheme();
-  const [status, setStatus] = useState<{ status: string; services?: Record<string, { reachable: boolean; latency: number }>; capabilities?: Record<string, boolean> } | null>(null);
+  const [status, setStatus] = useState<{
+    status: string;
+    services?: Record<string, { reachable: boolean; latency: number }>;
+    capabilities?: Record<string, boolean>;
+    agnesConfigured?: boolean;
+    agnesKeys?: { total: number; available: number; benched: number; disabled: number };
+  } | null>(null);
 
   useEffect(() => {
     fetch("/api/health").then((r) => r.json()).then(setStatus).catch(() => setStatus(null));
@@ -64,7 +70,7 @@ export function SettingsView({ onOpenMobileNav }: { onOpenMobileNav: () => void 
           <h1 className="flex items-center gap-2 text-sm font-semibold">
             <SettingsIcon className="h-4 w-4 text-[#2563EB]" /> Settings
           </h1>
-          <p className="hidden text-[11px] text-[#94A3B8] sm:block">Preferences are stored on this device</p>
+          <p className="hidden text-[11px] text-[#94A3B8] sm:block">Preferences stored on this device · Pesles AI (Agnes) configured: {status?.agnesConfigured ? "yes" : "no"}</p>
         </div>
       </header>
 
@@ -90,48 +96,84 @@ export function SettingsView({ onOpenMobileNav }: { onOpenMobileNav: () => void 
           </Section>
 
           {/* Chat */}
-          <Section title="Chat" desc="How Bliss behaves when you write.">
+          <Section title="Chat" desc="Pesles AI (Agnes) = streaming + vision. CVRON = no-key fallback.">
             <div className="pb-2">
-              <p className="mb-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">Default model</p>
+              <p className="mb-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">Default chat model</p>
               <div className="grid gap-2 sm:grid-cols-2">
                 {MODELS.map((m) => (
-                  <button key={m.id} onClick={() => s.setDefaultModel(m.id)} className={cn("flex items-center gap-2 rounded-xl border p-2.5 text-left text-xs font-medium transition", s.defaultModel === m.id ? "border-[#2563EB]/40 bg-[#EFF6FF] dark:bg-[#2563EB]/15" : "hover:bg-slate-50 dark:hover:bg-white/5")}>
+                  <button key={m.id} onClick={() => s.setDefaultModel(m.id)} className={cn("flex items-center gap-2 rounded-xl border p-2.5 text-left text-xs font-medium transition", s.defaultModel === m.id ? "border-[#7C3AED]/40 bg-[#F5F3FF] dark:bg-[#7C3AED]/15" : "hover:bg-slate-50 dark:hover:bg-white/5", m.provider.includes("Agnes") && "border-[#7C3AED]/20")}>
                     <span className="text-base">{m.icon}</span>
                     <span className="flex-1 truncate">{m.name}</span>
-                    {s.defaultModel === m.id && <Check className="h-3.5 w-3.5 text-[#2563EB]" />}
+                    {m.provider.includes("Agnes") && <Badge className="bg-[#7C3AED]/10 text-[#7C3AED] text-[10px]">Pesles</Badge>}
+                    {s.defaultModel === m.id && <Check className="h-3.5 w-3.5 text-[#7C3AED]" />}
                   </button>
                 ))}
               </div>
+              <p className="mt-2 text-[11px] text-[#94A3B8]">Agnes models stream tokens live; CVRON folds your last 8 turns into one prompt.</p>
             </div>
             <Row title="Enter sends the message" desc="When off, use Ctrl/Cmd + Enter to send. Shift + Enter always adds a newline.">
               <Toggle label="Enter to send" checked={s.enterToSend} onChange={s.setEnterToSend} />
             </Row>
-            <Row title="Render Markdown" desc="Format replies with headings, tables and highlighted code. Turn off to see raw text.">
+            <Row title="Render Markdown" desc="Format replies with headings, tables and highlighted code.">
               <Toggle label="Markdown" checked={s.markdownRendering} onChange={s.setMarkdown} />
             </Row>
           </Section>
 
           {/* Generation */}
           <Section title="Generation" desc="Defaults used by the creative studios.">
-            <Row title="Default image model" desc="Flux Dev is the only documented text-to-image endpoint.">
-              <Badge className="gap-1"><Check className="h-3 w-3 text-[#22C55E]" /> {IMAGE_MODELS[0].name}</Badge>
-            </Row>
-            <Row title="Default video model" desc="WAN 2.2 accepts an image plus a motion prompt. Text-to-video is not offered.">
-              <Badge className="gap-1"><Check className="h-3 w-3 text-[#22C55E]" /> {VIDEO_MODELS[0].name}</Badge>
-            </Row>
-            <Row title="Default aspect ratio" desc="Applied as a hint in the prompt — the provider always returns its own canvas size.">
-              <select value={s.defaultImageAspect} onChange={(e) => useSettingsStore.setState({ defaultImageAspect: e.target.value })} className="h-9 rounded-xl border border-[rgba(148,163,184,0.16)] bg-white px-2 text-xs dark:bg-[#0B1220]">
-                {["1:1", "16:9", "9:16", "4:3"].map((r) => <option key={r}>{r}</option>)}
-              </select>
-            </Row>
+            <div className="space-y-3">
+              <div>
+                <p className="mb-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">Default image model</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {IMAGE_MODELS.map((m) => (
+                    <button key={m.id} onClick={() => useSettingsStore.setState({ defaultImageModel: m.id })} className={cn("flex items-center gap-2 rounded-xl border p-2.5 text-left text-xs font-medium transition", s.defaultImageModel === m.id ? "border-[#7C3AED]/40 bg-[#F5F3FF] dark:bg-[#7C3AED]/15" : "hover:bg-slate-50 dark:hover:bg-white/5")}>
+                      <span className="text-sm">🎨</span><span className="flex-1 truncate">{m.name}</span><span className="text-[10px] text-[#94A3B8]">{m.provider.split("·")[0]}</span>
+                      {s.defaultImageModel === m.id && <Check className="h-3.5 w-3.5 text-[#7C3AED]" />}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1 text-[11px] text-[#94A3B8]">Agnes Image: 1K–4K + ratios, response_format in extra_body; Flux: ~3s</p>
+              </div>
+              <div>
+                <p className="mb-1.5 text-xs font-semibold text-slate-600 dark:text-slate-300">Default video model</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {VIDEO_MODELS.map((m) => (
+                    <button key={m.id} onClick={() => useSettingsStore.setState({ defaultVideoModel: m.id })} className={cn("flex items-center gap-2 rounded-xl border p-2.5 text-left text-xs font-medium transition", s.defaultVideoModel === m.id ? "border-[#7C3AED]/40 bg-[#F5F3FF] dark:bg-[#7C3AED]/15" : "hover:bg-slate-50 dark:hover:bg-white/5")}>
+                      <span className="text-sm">🎬</span><span className="flex-1 truncate">{m.name}</span><span className="text-[10px] text-[#94A3B8]">{m.provider.split("·")[0]}</span>
+                      {s.defaultVideoModel === m.id && <Check className="h-3.5 w-3.5 text-[#7C3AED]" />}
+                    </button>
+                  ))}
+                </div>
+                <p className="mt-1 text-[11px] text-[#94A3B8]">Agnes Video: async polling every 5s, 8n+1 frames; WAN 2.2: sync single request</p>
+              </div>
+              <Row title="Default aspect ratio" desc="For Flux hint; Agnes uses explicit size+ratio (1K–4K tiers).">
+                <select value={s.defaultImageAspect} onChange={(e) => useSettingsStore.setState({ defaultImageAspect: e.target.value })} className="h-9 rounded-xl border border-[rgba(148,163,184,0.16)] bg-white px-2 text-xs dark:bg-[#0B1220]">
+                  {["1:1", "16:9", "9:16", "4:3", "3:4", "2:3", "3:2", "21:9"].map((r) => <option key={r}>{r}</option>)}
+                </select>
+              </Row>
+            </div>
+          </Section>
+
+          {/* Pesles AI config */}
+          <Section title="Pesles AI (Agnes) configuration" desc="Free-tier $0 promo — 20/min text, 1/min video. Get key at platform.agnes-ai.com">
+            <div className="rounded-xl border border-[#7C3AED]/20 bg-[#F5F3FF] p-3 dark:bg-[#7C3AED]/10">
+              <p className="text-xs font-semibold text-[#7C3AED] flex items-center gap-1.5"><Sparkles className="h-3.5 w-3.5" /> Key pool status</p>
+              <p className="mt-1 text-xs text-[#94A3B8]">
+                {status?.agnesConfigured
+                  ? `Configured · ${status.agnesKeys?.total} keys · ${status.agnesKeys?.available} available · ${status.agnesKeys?.benched} benched · ${status.agnesKeys?.disabled} disabled`
+                  : "Not configured — add AGNES_API_KEY_1 to .env, restart server. Without it, only CVRON (non-streaming) works."}
+              </p>
+              <pre className="mt-2 overflow-x-auto rounded-lg bg-white p-2 font-mono text-[11px] dark:bg-[#0B1220]">{`AGNES_API_KEY_1=sk-...\nAGNES_API_KEY_2=sk-...\n# or comma-separated:\nAGNES_API_KEYS=sk-...,sk-...\nAGNES_API_KEY=sk-...`}</pre>
+              <p className="mt-2 text-[11px] text-[#94A3B8]">Rotates round-robin; 429→benched 60s, 402→1h, 401→permanently. Video polling uses same key that created task (account-scoped). Frontend never sees keys.</p>
+            </div>
           </Section>
 
           {/* Privacy */}
           <Section title="Privacy & data" desc="What Bliss keeps, and what leaves this device.">
             <div className="space-y-2 pb-3 text-xs leading-relaxed text-[#94A3B8]">
               <p className="flex gap-2"><Database className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#2563EB]" /> Stored in this browser only: conversations, saved items, generated media references and preferences (localStorage keys beginning with <code className="rounded bg-slate-100 px-1 dark:bg-white/10">bliss-</code>).</p>
-              <p className="flex gap-2"><Shield className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#2563EB]" /> Sent to the provider: every prompt you submit, plus the last six messages of the active conversation as context. Image URLs you paste are forwarded to the editing and video endpoints.</p>
-              <p className="flex gap-2"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#2563EB]" /> No account, no database, no analytics. Requests are proxied through Bliss&rsquo;s server routes so the upstream sees your prompt but never your credentials (there are none).</p>
+              <p className="flex gap-2"><Shield className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#2563EB]" /> Sent to the provider: every prompt you submit, plus last 8 turns as context (native messages for Agnes, folded prompt for CVRON). Uploaded images downscaled to 2048px, sent as base64 data URIs — only tiny 256px thumbnails touch localStorage.</p>
+              <p className="flex gap-2"><Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#2563EB]" /> No account, no database, no analytics. Requests proxied so upstream sees prompt but never your credentials. Agnes detail → server console only.</p>
             </div>
             <Row title="Clear conversation history" desc={`${useChatStore.getState().conversations.length} conversations stored locally`}>
               <Button size="sm" variant="outline" className="gap-1.5 text-[#EF4444]" onClick={() => { useChatStore.getState().clearAll(); toast.info("Conversations deleted"); }}>
@@ -146,10 +188,11 @@ export function SettingsView({ onOpenMobileNav }: { onOpenMobileNav: () => void 
           </Section>
 
           {/* API info */}
-          <Section title="Service status" desc="Live probe of the upstream provider, refreshed when you open Settings.">
-            <div className="grid gap-2 sm:grid-cols-2">
-              <StatusTile label="Text generation" ok={status?.services?.text?.reachable} latency={status?.services?.text?.latency} />
-              <StatusTile label="Image generation" ok={status?.services?.image?.reachable} latency={status?.services?.image?.latency} />
+          <Section title="Service status" desc="Live probe of the upstream providers, refreshed when you open Settings.">
+            <div className="grid gap-2 sm:grid-cols-3">
+              <StatusTile label="Text (CVRON)" ok={status?.services?.text?.reachable} latency={status?.services?.text?.latency} />
+              <StatusTile label="Image (CVRON)" ok={status?.services?.image?.reachable} latency={status?.services?.image?.latency} />
+              <StatusTile label="Pesles AI" ok={status?.services?.agnes?.reachable} latency={status?.services?.agnes?.latency} sub={status?.agnesConfigured ? `${status.agnesKeys?.available}/${status.agnesKeys?.total} keys` : "No key"} />
             </div>
             <div className="mt-3 flex flex-wrap gap-1.5">
               {Object.entries(status?.capabilities ?? {}).map(([k, v]) => (
@@ -161,12 +204,12 @@ export function SettingsView({ onOpenMobileNav }: { onOpenMobileNav: () => void 
             </div>
             <p className="mt-3 text-[11px] leading-relaxed text-[#94A3B8]">
               {status?.status === "operational"
-                ? "The provider responded to the health probe from the server."
-                : "The provider didn't answer the health probe. This is common for free public endpoints — generations are retried automatically and failures are reported honestly instead of faked."}
+                ? "At least one provider responded to the health probe from the server."
+                : "Providers didn't answer the health probe. For Agnes, check your API keys; for CVRON, generations are retried and failures reported honestly."}
             </p>
           </Section>
 
-          <p className="pb-4 text-center text-[11px] text-[#94A3B8]">Bliss · Your ideas. Infinite possibilities. · v1.0.0</p>
+          <p className="pb-4 text-center text-[11px] text-[#94A3B8]">Bliss · Pesles AI + CVRON · Free tier $0 promo · Streaming + vision via Agnes</p>
         </div>
       </div>
     </div>
@@ -185,13 +228,13 @@ function Section({ title, desc, children }: { title: string; desc: string; child
   );
 }
 
-function StatusTile({ label, ok, latency }: { label: string; ok?: boolean; latency?: number }) {
+function StatusTile({ label, ok, latency, sub }: { label: string; ok?: boolean; latency?: number; sub?: string }) {
   return (
     <div className="flex items-center gap-2.5 rounded-xl border p-3">
       <span className={cn("h-2.5 w-2.5 rounded-full", ok ? "bg-[#22C55E]" : "bg-[#EF4444]")} />
       <div className="flex-1">
         <p className="text-xs font-semibold">{label}</p>
-        <p className="text-[10px] text-[#94A3B8]">{ok ? `${latency ?? 0}ms response` : "unreachable from server"}</p>
+        <p className="text-[10px] text-[#94A3B8]">{ok ? `${latency ?? 0}ms · ${sub ?? "reachable"}` : sub ?? "unreachable from server"}</p>
       </div>
     </div>
   );

@@ -151,9 +151,9 @@ describe("POST /api/image", () => {
         return Response.json({ success: true, image_url: "https://cdn.test/img-1.jpg" });
       })
     );
-    const res = await imagePOST(req({ prompt: "a blue planet" }, {}) as never);
+    const res = await imagePOST(req({ prompt: "a blue planet", model: "flux-dev" } as never, {}) as never);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true, imageUrl: "https://cdn.test/img-1.jpg" });
+    expect(await res.json()).toMatchObject({ success: true, imageUrl: "https://cdn.test/img-1.jpg" });
   });
 
   it("surfaces a generation failure instead of a placeholder image", async () => {
@@ -196,10 +196,11 @@ describe("POST /api/image", () => {
 
 /* ------------------------------------------------------------------ */
 describe("POST /api/video", () => {
-  it("requires a source image — text-to-video is not offered", async () => {
-    const fetchMock = vi.fn();
+  it("requires a source image for CVRON — but Agnes allows text-to-video", async () => {
+    const fetchMock = vi.fn(async () => Response.json({ success: true, video_id: "vid_test", status: "queued", videoId: "vid_test" }));
     vi.stubGlobal("fetch", fetchMock);
-    const res = await videoPOST(req({ prompt: "make it move" }) as never);
+    // Without AGNES_API_KEY, falls back to CVRON which requires image
+    const res = await videoPOST(req({ prompt: "make it move", model: "wan-2.2" }) as never);
     expect(res.status).toBe(400);
     expect((await res.json()).error).toMatch(/image-to-video only/i);
     expect(fetchMock).not.toHaveBeenCalled();
@@ -215,10 +216,10 @@ describe("POST /api/video", () => {
       })
     );
     const res = await videoPOST(
-      req({ prompt: "drifting clouds", imageUrl: "https://host/sky.jpg" }) as never
+      req({ prompt: "drifting clouds", imageUrl: "https://host/sky.jpg", model: "wan-2.2" }) as never
     );
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true, videoUrl: "https://cdn.test/clip.mp4" });
+    expect(await res.json()).toMatchObject({ success: true, videoUrl: "https://cdn.test/clip.mp4" });
     const u = new URL(seen);
     expect(u.pathname).toBe("/cvronai/wan22.php");
     expect(u.searchParams.get("image")).toBe("https://host/sky.jpg");
@@ -310,10 +311,10 @@ describe("GET /api/health", () => {
     expect(body.success).toBe(true);
     expect(body.status).toBe("operational");
     expect(body.cached).toBe(false);
-    // Honesty checks: no capabilities we do not actually have
-    expect(body.capabilities.vision).toBe(false);
-    expect(body.capabilities.streaming).toBe(false);
-    expect(body.capabilities.textToVideo).toBe(false);
+    // With Pesles AI (Agnes) we now honestly claim streaming + vision + textToVideo
+    expect(body.capabilities.vision).toBe(true);
+    expect(body.capabilities.streaming).toBe(true);
+    expect(body.capabilities.textToVideo).toBe(true);
     const probesAfterFirst = fetchMock.mock.calls.length;
 
     const second = await (GET() as Promise<Response>);

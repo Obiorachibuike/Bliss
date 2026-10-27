@@ -54,7 +54,8 @@ describe("composer", () => {
     expect(onSend).not.toHaveBeenCalled();
 
     fireEvent.keyDown(box, { key: "Enter" });
-    expect(onSend).toHaveBeenCalledWith("first line second");
+    // Updated Composer now sends (text, images?) — second arg undefined for no images
+    expect(onSend).toHaveBeenCalledWith("first line second", undefined);
     expect(box).toHaveValue("");
   });
 
@@ -67,7 +68,7 @@ describe("composer", () => {
     fireEvent.keyDown(box, { key: "Enter" });
     expect(onSend).not.toHaveBeenCalled();
     fireEvent.keyDown(box, { key: "Enter", metaKey: true });
-    expect(onSend).toHaveBeenCalledWith("hello");
+    expect(onSend).toHaveBeenCalledWith("hello", undefined);
   });
 
   it("never sends an empty message and shows a stop control while streaming", () => {
@@ -90,15 +91,28 @@ describe("composer", () => {
     expect(onModelChange).toHaveBeenCalledWith("deepseek-v3.2");
   });
 
-  it("adds an image reference without pretending the model can see it", async () => {
+  it("adds an image reference — for non-vision models as markdown, for Agnes as vision attachment", async () => {
     const onSend = vi.fn();
+    // Non-vision model shows disclaimer
     render(wrap(<Composer onSend={onSend} selectedModel="llama" onModelChange={vi.fn()} />));
-    await userEvent.click(screen.getByRole("button", { name: /attach an image reference/i }));
-    expect(screen.getByText(/accept text only/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /attach files/i }));
+    expect(screen.getByText(/accepts text only/i)).toBeInTheDocument();
     await userEvent.type(screen.getByPlaceholderText(/https:\/\/example\.com\/photo\.jpg/i), "https://cdn.test/a.jpg");
-    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    await userEvent.click(screen.getByRole("button", { name: /Add URL/i }));
     await userEvent.click(screen.getByRole("button", { name: /send message/i }));
-    expect(onSend).toHaveBeenCalledWith(expect.stringContaining("![reference image](https://cdn.test/a.jpg)"));
+    expect(onSend).toHaveBeenCalledWith(expect.stringContaining("![reference image](https://cdn.test/a.jpg)"), undefined);
+  });
+
+  it("attaches images as vision input for Agnes models", async () => {
+    const onSend = vi.fn();
+    render(wrap(<Composer onSend={onSend} selectedModel="agnes-2.0-flash" onModelChange={vi.fn()} />));
+    await userEvent.click(screen.getByRole("button", { name: /attach files/i }));
+    expect(screen.getByText(/vision input/i)).toBeInTheDocument();
+    await userEvent.type(screen.getByPlaceholderText(/https:\/\/example\.com\/photo\.jpg/i), "https://cdn.test/b.jpg");
+    await userEvent.click(screen.getByRole("button", { name: /Add URL/i }));
+    await userEvent.type(screen.getByRole("textbox", { name: /message bliss/i }), "describe this");
+    await userEvent.click(screen.getByRole("button", { name: /send message/i }));
+    expect(onSend).toHaveBeenCalledWith("describe this", ["https://cdn.test/b.jpg"]);
   });
 });
 

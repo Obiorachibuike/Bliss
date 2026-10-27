@@ -8,7 +8,7 @@ beforeEach(() => {
   // Reset every store between tests so ordering never matters.
   useChatStore.setState({ conversations: [], activeId: null, streaming: false, error: null });
   useSavedStore.setState({ items: [], images: [], videos: [] });
-  useSettingsStore.setState({ theme: "dark", defaultModel: "llama", enterToSend: true });
+  useSettingsStore.setState({ theme: "dark", defaultModel: "agnes-2.0-flash", enterToSend: true });
 });
 
 describe("conversation lifecycle", () => {

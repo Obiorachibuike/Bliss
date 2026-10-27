@@ -15,6 +15,9 @@ const MODEL_ENDPOINT: Record<ModelId, string> = {
   "gpt-5-nano": ENDPOINTS.chat.gpt5nano,
   "gemini-2.5-flash-lite": ENDPOINTS.chat.gemini,
   "deepseek-v3.2": ENDPOINTS.chat.deepseek,
+  "agnes-2.0-flash": ENDPOINTS.chat.agnesChat,
+  "agnes-2.5-flash": ENDPOINTS.chat.agnesChat,
+  "agnes-3.0-flash": ENDPOINTS.chat.agnesChat,
 };
 
 export function resolveEndpoint(model: ModelId): string {
